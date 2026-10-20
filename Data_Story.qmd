@@ -1,5 +1,58 @@
 ---
 title: "Data_Story"
-format: html
+format: pdf
 ---
+
+Between 2021 and 2025, do the 10 pages that readers click to most often from the “Climate change” article stay the same, or do they drift away from the 2021 list? 
+
+The Wikimedia Clickstream (Wikimedia Foundation; Wulczyn and Taraborelli, doi:10.6084/m9.figshare.1305770), a public dataset released monthly at dumps.wikimedia.org/other/clickstream/. Each row says how many times readers clicked from one English Wikipedia page to another in a month. I will use one monthly file for each year from 2021 to 2025, five files in all, and keep the rows where readers clicked a link on the "Climate change" article. Each row is then a destination page and its number of clicks.
+
+My plan is to create a table of the top ten most clicked links from the Wikipedia page for climate change for one month in each year. I will do this for each year, then compare how the most clicked links has shifted from a baseline of 2021 each year.
+I make up 30 destination pages. In 2021 a few get a lot of clicks and most get very few, which is how clicks tend to work on Wikipedia. Each year every page's clicks vary a little, and four of the lower-ranked pages (pages 11 to 14) slowly gain more clicks each year.
+```{r}
+#| echo: false
+#| warning: false
+library(tidyverse)
+```
+
+
+```{r}
+set.seed(853)
+
+pages <- tibble(
+  page = paste("Page", 1:30),
+  base_clicks = round(20000 / (1:30) * runif(30, min = 0.7, max = 1.3))
+)
+
+sim <- expand_grid(pages, year = 2021:2025) |>
+  mutate(
+    growth = if_else(page %in% paste("Page", 11:14), 1 + 0.25 * (year - 2021), 1),
+    clicks = round(base_clicks * growth * runif(n(), min = 0.8, max = 1.2))
+  ) |>
+  select(page, year, clicks)
+
+sim |> filter(page == "Page 12")
+```
+## Now that we have simulated the clicks from 2021-2025, we want to find the top 10 destination pages, and how many of them were also in the top ten for 2021. 
+```{r}
+top10 <- sim |>
+  slice_max(clicks, n = 10, by = year, with_ties = FALSE)
+
+top10
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
