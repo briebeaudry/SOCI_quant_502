@@ -1,0 +1,178 @@
+---
+title: "Data Story Simulation: Do Protest Waves Shift What We Read on Wikipedia?"
+author: "Brie Beaudry"
+format:
+  pdf:
+    geometry: "margin=0.4in"
+    fontsize: 9pt
+    linestretch: 0.95
+    colorlinks: true
+    toc: false
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+## Research Question
+
+**How do the Wikipedia pages people click on from the "Climate change" article change during months with major U.S. climate protests?**
+
+Protests bring public attention to particular issues, but it is less clear whether this attention changes how people seek out information. This project explores the relationship between collective action in public spaces and how people navigate environmental knowledge online.
+
+## Data Sources
+
+- **Protests:** The [Crowd Counting Consortium (CCC)](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/6OPP7H) collects data on protest events in the United States. I will use monthly counts of climate and environmental protests, defining a **protest wave** as a month in the top 10% of counts.
+- **Wikipedia clicks:** The [Wikimedia Clickstream dataset](https://dumps.wikimedia.org/other/clickstream/) records clicks between Wikipedia pages each month. I will focus on links from the "Climate change" article to see which pages people visit next.
+
+## Simulated Data and Analysis
+
+### 1: Simulate the Clickstream
+
+The fake data has 30 destination pages (Page 1 is the most popular, and popularity falls off quickly) and 8 pairs of months. Each pair has a "before" and an "after" month. Four pairs are wave pairs, where the "after" month is a protest wave. Four are ordinary pairs.
+
+The planted effect is in wave pairs only; Pages 11 to 14 get 75% more clicks in the "after" month. That makes 30 pages × 8 pairs × 2 months = 480 rows.
+
+#### 1.1. Setup
+```{r}
+#| label: setup
+
+library(tidyverse)
+set.seed(853)
+```
+#### 1.2 Simulating Clickstream
+```{r}
+#| label: simulate_clickstream
+
+#| label: simulate_data
+
+# Each page gets a "normal" monthly click level
+pages <- 
+  tibble(
+    page = paste("Page", 1:30),
+    base = round(20000 / (1:30) * runif(30, .7, 1.3))
+  )
+
+# Every combination of page x pair x month (30 x 8 x 2 = 480 rows)
+sim <- expand_grid(
+  pages,
+  pair = 1:8,
+  month_type = c("before", "after")
+) |>
+  mutate(
+    # Pairs 1-4 are protest waves; pairs 5-8 are ordinary
+    pair_type = if_else(pair <= 4, "wave", "ordinary"),
+    
+    # Planted effect: +75% clicks, only for Pages 11-14,
+    # only in the "after" month, only in wave pairs
+    growth = if_else(
+      pair_type == "wave" & month_type == "after" &
+        page %in% paste("Page", 11:14),
+      1.75, 1
+    ),
+    
+    # Clicks = normal level x growth
+    clicks = round(base * growth)
+  ) |>
+  select(pair, pair_type, month_type, page, clicks)
+
+stopifnot(nrow(sim) == 480)  # safety check
+
+head(sim)
+```
+## Step 2: Compare the Top 10 Destination Pages
+
+For each pair and month, I keep the 10 most-clicked pages. Then, for each pair, I count how many of the "after" top 10 were also in the "before" top 10. This is the overlap, from 0 to 10. An overlap of 10 means the list did not change. A lower overlap means new pages pushed into the top 10. Finally, I take the median for wave pairs and for ordinary pairs.
+
+```{r}
+#| label: page-overlap
+
+# The 10 most-clicked pages in each pair and month
+top10 <- sim |>
+  slice_max(
+    clicks,
+    n = 10,
+    by = c(pair, month_type),
+    with_ties = FALSE
+  )
+
+# For each pair: how many "after" top-10 pages were also in the "before" top 10?
+overlap <- top10 |>
+  group_by(pair, pair_type) |>
+  summarise(
+    shared = sum(
+      page[month_type == "after"] %in%
+        page[month_type == "before"]
+    ),
+    .groups = "drop"
+  )
+
+# Typical (median) overlap for wave vs. ordinary pairs
+results <- overlap |>
+  group_by(pair_type) |>
+  summarise(
+    median_overlap = median(shared),
+    .groups = "drop"
+  )
+
+results
+```
+## Step 3: Apply the Decision Rule
+
+I set this rule before looking at any real data:
+$$
+\text{Difference} = \text{Median Overlap}_{\text{ordinary}} - \text{Median Overlap}_{\text{wave}}
+$$
+
+```{r}
+#| label: decision-rule
+
+wave <- 
+  results |>
+  filter(pair_type == "wave") |>
+  pull(median_overlap)
+
+ordinary <- 
+  results |>
+  filter(pair_type == "ordinary") |>
+  pull(median_overlap)
+
+tibble(
+  wave_overlap = wave,
+  ordinary_overlap = ordinary,
+  difference = ordinary - wave,
+  meets_rule = ordinary - wave >= 2
+)
+```
+When meets_rule is TRUE, the wave pairs kept at least 2 fewer of the same top 10 pages than the ordinary pairs, which shows the method can detect the attention shift I planted in the fake data and is ready to be used on the real protest and Wikipedia data.
+
+If the real data shows the median top 10 overlap in protest wave pairs is at least 2 pages lower than in ordinary pairs (Difference ≥ 2), I would conclude that protest waves go along with a shift in what people read. A smaller difference would mean there is no evidence of a shift, though even a clear difference would show association, not cause.
+
+## References
+
+1. Crowd Counting Consortium. *Crowd Counting Consortium Data*. Harvard Kennedy School Ash Center and University of Connecticut. Harvard Dataverse. <https://doi.org/10.7910/DVN/6OPP7H>. About the project: <https://countingcrowds.org/about/>
+2. Wikimedia Foundation. *Wikipedia Clickstream*. <https://dumps.wikimedia.org/other/clickstream/>. Background: <https://meta.wikimedia.org/wiki/Research:Wikipedia_clickstream>
+3. Wickham, H., et al. (2019). Welcome to the tidyverse. *Journal of Open Source Software, 4*(43), 1686. <https://doi.org/10.21105/joss.01686>
+4. Alexander, R. (2023). *Telling Stories with Data*. Chapman & Hall/CRC. <https://tellingstorieswithdata.com/>
+5. R Core Team. *R: A Language and Environment for Statistical Computing*. R Foundation for Statistical Computing. <https://www.R-project.org/>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

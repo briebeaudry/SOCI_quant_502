@@ -123,6 +123,7 @@ I set this rule before looking at any real data:
 $$
 \text{Difference} = \text{Median Overlap}_{\text{ordinary}} - \text{Median Overlap}_{\text{wave}}
 $$
+
 ```{r}
 #| label: decision-rule
 
@@ -143,6 +144,10 @@ tibble(
   meets_rule = ordinary - wave >= 2
 )
 ```
+When meets_rule is TRUE, the wave pairs kept at least 2 fewer of the same top 10 pages than the ordinary pairs, which shows the method can detect the attention shift I planted in the fake data and is ready to be used on the real protest and Wikipedia data.
+
+If the real data shows the median top 10 overlap in protest wave pairs is at least 2 pages lower than in ordinary pairs (Difference ≥ 2), I would conclude that protest waves go along with a shift in what people read. A smaller difference would mean there is no evidence of a shift, though even a clear difference would show association, not cause.
+
 ## References
 
 1. Crowd Counting Consortium. *Crowd Counting Consortium Data*. Harvard Kennedy School Ash Center and University of Connecticut. Harvard Dataverse. <https://doi.org/10.7910/DVN/6OPP7H>. About the project: <https://countingcrowds.org/about/>
