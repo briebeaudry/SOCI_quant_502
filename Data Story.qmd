@@ -2,6 +2,7 @@
 title: "Week Eight Practice"
 format: html
 ---
+The firsrt step is to read in the Crowd Counting Consortium data. I downloaded the three availible phases; 2017-2020, 2021-2024, and 2025's currently availiable data.
 ```{r}
 #library(tidyverse)
 #library(lubridate)
@@ -10,7 +11,7 @@ format: html
 ccc_files <- list.files("data/raw/ccc", pattern = "\\.csv$", full.names = TRUE)
 ccc_files
 ```
-
+I want to stack the three csv files into one table. 
 ```{r}
 ccc_raw <- ccc_files |>
   map(\(f) read_csv(f, col_types = cols(.default = col_character())) |>
@@ -23,6 +24,7 @@ nrow
 ccc_raw |>
   head()
 ```
+I have run into a program where the three phases all call the "protest inciting issue" different column names. The older phases use "issues," whereas the newer phases use "issues_tags." 
 ```{r}
 ccc_raw |>
   summarise(
@@ -37,7 +39,23 @@ ccc_raw <-
   mutate(topic = coalesce(issue_tags, issues, issue_tags_summary))
 
 sum(is.na(ccc_raw$topic))
+
+ccc_raw |> count(topic, sort = TRUE) |> head(20)
+sum(is.na(ccc_raw$topic))
+
+climate <- ccc_raw |>
+  filter(str_detect(str_to_lower(topic), "environment|climate"))
+
+nrow(climate)
+climate |> count(topic, sort = TRUE) |> head(15)
 ```
+```{r}
+ccc_raw |>
+  filter(is.na(topic)) |>
+  mutate(year = str_sub(date, 1, 4)) |>
+  count(year)
+```
+
 
 
 
