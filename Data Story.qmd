@@ -3,8 +3,41 @@ title: "Week Eight Practice"
 format: html
 ---
 ```{r}
-library(tidyverse)
-library(lubridate)
+#library(tidyverse)
+#library(lubridate)
 ```
+```{r}
+ccc_files <- list.files("data/raw/ccc", pattern = "\\.csv$", full.names = TRUE)
+ccc_files
+```
+
+```{r}
+ccc_raw <- ccc_files |>
+  map(\(f) read_csv(f, col_types = cols(.default = col_character())) |>
+        rename_with(tolower)) |>
+  list_rbind()
+
+names(ccc_raw)
+nrow
+
+ccc_raw |>
+  head()
+```
+```{r}
+ccc_raw |>
+  summarise(
+    issues       = sum(!is.na(issues)),
+    issue_tags   = sum(!is.na(issue_tags)),
+    tags_summary = sum(!is.na(issue_tags_summary)),
+    total_rows   = n()
+  )
+
+ccc_raw <- 
+  ccc_raw |>
+  mutate(topic = coalesce(issue_tags, issues, issue_tags_summary))
+
+sum(is.na(ccc_raw$topic))
+```
+
 
 
