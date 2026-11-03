@@ -1,5 +1,5 @@
 ---
-title: "Week Eight Practice"
+title: "Reading in Data"
 format: pdf
 ---
 The first step is to read in the Crowd Counting Consortium data. I downloaded the three available phases; 2017-2020, 2021-2024, and 2025's currently availiable data.
@@ -58,4 +58,42 @@ ccc_raw |>
 
 
 Next, I will turn each protest date into a month and count how many climate and environmental protests happened in each month. This will allow me to find the protest waves (a month in the top 10% of monthly counts), which will tell me what wikipedia data I need to download.
+
+```{r}
+climate <- 
+  climate |>
+  mutate(
+    date  = as_date(parse_date_time(date, orders = c("ymd", "mdy"))),
+    month = floor_date(date, "month")
+  )
+
+nrow(climate)
+range(climate$date, na.rm = TRUE)
+sum(is.na(climate$date))
+
+
+climate <- climate |>
+  mutate(
+    date  = as_date(parse_date_time(date, orders = c("ymd", "mdy"))),
+    month = floor_date(date, "month")
+  )
+
+nrow(climate)
+range(climate$date, na.rm = TRUE)
+sum(is.na(climate$date))
+```
+
+```{r}
+monthly <-
+  climate |>
+  count(month, name = "protests")
+monthly |> arrange(month)
+head(10)
+```
+```{r}
+exists("climate")
+```
+
+
+
 
