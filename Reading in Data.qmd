@@ -1,11 +1,11 @@
 ---
 title: "Week Eight Practice"
-format: html
+format: pdf
 ---
-The firsrt step is to read in the Crowd Counting Consortium data. I downloaded the three availible phases; 2017-2020, 2021-2024, and 2025's currently availiable data.
+The first step is to read in the Crowd Counting Consortium data. I downloaded the three available phases; 2017-2020, 2021-2024, and 2025's currently availiable data.
 ```{r}
-#library(tidyverse)
-#library(lubridate)
+library(tidyverse)
+library(lubridate)
 ```
 ```{r}
 ccc_files <- list.files("data/raw/ccc", pattern = "\\.csv$", full.names = TRUE)
@@ -16,7 +16,7 @@ I want to stack the three csv files into one table.
 ccc_raw <- ccc_files |>
   map(\(f) read_csv(f, col_types = cols(.default = col_character())) |>
         rename_with(tolower)) |>
-  list_rbind()
+   bind_rows()
 
 names(ccc_raw)
 nrow
@@ -24,7 +24,7 @@ nrow
 ccc_raw |>
   head()
 ```
-I have run into a program where the three phases all call the "protest inciting issue" different column names. The older phases use "issues," whereas the newer phases use "issues_tags." 
+I have run into a problem where the three phases all call the "protest inciting issue" different column names. The older phases use "issues," whereas the newer phases use "issues_tags." 
 ```{r}
 ccc_raw |>
   summarise(
@@ -57,5 +57,5 @@ ccc_raw |>
 ```
 
 
-
+Next, I will turn each protest date into a month and count how many climate and environmental protests happened in each month. This will allow me to find the protest waves (a month in the top 10% of monthly counts), which will tell me what wikipedia data I need to download.
 
