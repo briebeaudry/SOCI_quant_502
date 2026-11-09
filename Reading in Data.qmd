@@ -2,6 +2,15 @@
 title: "Reading in Data"
 format: pdf
 ---
+
+Today we are going to jump back into ggplot to visualize some data! My goal is to make it as pink as possible. 
+
+Heres where things stand right now: I have read in all three time periods of the protest data, found the "topic" columns and renamed them so they all match (why they called the same columns different titles for different years is beyond me!). I decided to drop events that had no topic as we determined that untagged events were evenly spread across years. I cleaned the data to only have events tagged "environment" or "climate," learning that many climate-type events have broader tags attached to them as well. Finally, we counted climate/environment protests per month. 
+
+Today, I want to find the "wave" months and build the "wave" and "ordinary" pairs. As a reminder, a wave pair is a "before" and "after" month pair where the after month is a protest wave, defined as a month in the top 10% of monthly protest counts. Note that the 10% is arbitrarily picked for the time being, and further projects along this line of thinking should conduct sensitivity tests around this.
+
+Some of this document is going to repeat last week's data, as I am writing this on the same project. I'll indicate where my new stuff starts ("finding the protest waves"). 
+
 The first step is to read in the Crowd Counting Consortium data. I downloaded the three available phases; 2017-2020, 2021-2024, and 2025's currently availiable data.
 ```{r}
 library(tidyverse)
@@ -49,15 +58,18 @@ climate <- ccc_raw |>
 nrow(climate)
 climate |> count(topic, sort = TRUE) |> head(15)
 ```
+I want to interrogate the distribution of untagged events to decide what I will do with the missing data.
 ```{r}
 ccc_raw |>
   filter(is.na(topic)) |>
   mutate(year = str_sub(date, 1, 4)) |>
   count(year)
+
+mean(is.na(ccc_raw$topic))
 ```
+I have decided that I will exclude events with no issue tags (about 2.4% of events, spread across all years)
 
-
-Next, I will turn each protest date into a month and count how many climate and environmental protests happened in each month. This will allow me to find the protest waves (a month in the top 10% of monthly counts), which will tell me what wikipedia data I need to download.
+Lets now count how many climate and environmental protests happened in each month. This will allow me to find the protest waves (a month in the top 10% of monthly counts), which will tell me what wikipedia data I need to download.
 
 ```{r}
 climate <- 
@@ -90,8 +102,16 @@ monthly <-
 monthly |> arrange(month)
 head(10)
 ```
+NEW STUFF!
+
+## Find the protest waves
+
+The Clickstream data starts in late 2017, so my study window begins in December 2017. The last month of CCC data (May 2026) is only partly covered, so the window ends at the last full month. Months with no protests in the data count as zero. A protest wave is a month in the top 10% of monthly counts.
+
+
+
 ```{r}
-exists("climate")
+
 ```
 
 
