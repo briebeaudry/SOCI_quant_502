@@ -9,14 +9,18 @@ Heres where things stand right now: I have read in all three time periods of the
 
 Today, I want to find the "wave" months and build the "wave" and "ordinary" pairs. As a reminder, a wave pair is a "before" and "after" month pair where the after month is a protest wave, defined as a month in the top 10% of monthly protest counts. Note that the 10% is arbitrarily picked for the time being, and further projects along this line of thinking should conduct sensitivity tests around this.
 
-Some of this document is going to repeat last week's data, as I am writing this on the same project. I'll indicate where my new stuff starts ("finding the protest waves"). 
+(Note from Brie of the future: We get sidetracked due to some outliers.)
+
+Some of this document is going to repeat last week's data, as I am writing this on the same file. I'll indicate where my new stuff starts.
 
 The first step is to read in the Crowd Counting Consortium data. I downloaded the three available phases; 2017-2020, 2021-2024, and 2025's currently availiable data.
 ```{r}
+#| echo: false 
 library(tidyverse)
 library(lubridate)
 ```
 ```{r}
+#| echo: false 
 ccc_files <- list.files("data/raw/ccc", pattern = "\\.csv$", full.names = TRUE)
 ccc_files
 ```
@@ -25,16 +29,18 @@ I want to stack the three csv files into one table.
 ccc_raw <- ccc_files |>
   map(\(f) read_csv(f, col_types = cols(.default = col_character())) |>
         rename_with(tolower)) |>
-   bind_rows()
+  bind_rows()
 
-names(ccc_raw)
-nrow
+nrow(ccc_raw)   # number of protest events
+ncol(ccc_raw)   # number of columns
 
 ccc_raw |>
+  select(date, locality, state, issues, issue_tags) |>
   head()
 ```
 I have run into a problem where the three phases all call the "protest inciting issue" different column names. The older phases use "issues," whereas the newer phases use "issues_tags." 
 ```{r}
+#| echo: false 
 ccc_raw |>
   summarise(
     issues       = sum(!is.na(issues)),
@@ -60,6 +66,7 @@ climate |> count(topic, sort = TRUE) |> head(15)
 ```
 I want to interrogate the distribution of untagged events to decide what I will do with the missing data.
 ```{r}
+#| echo: false 
 ccc_raw |>
   filter(is.na(topic)) |>
   mutate(year = str_sub(date, 1, 4)) |>
@@ -72,6 +79,7 @@ I have decided that I will exclude events with no issue tags (about 2.4% of even
 Lets now count how many climate and environmental protests happened in each month. This will allow me to find the protest waves (a month in the top 10% of monthly counts), which will tell me what wikipedia data I need to download.
 
 ```{r}
+#| echo: false 
 climate <- 
   climate |>
   mutate(
@@ -96,13 +104,103 @@ sum(is.na(climate$date))
 ```
 
 ```{r}
+#| echo: false 
 monthly <-
   climate |>
   count(month, name = "protests")
 monthly |> arrange(month)
 head(10)
 ```
-NEW STUFF!
+# NEW STUFF!
+
+Lets visualize some protests!
+
+(Note from Brie of the future: I start with bar graphs and quickly realize they look bad, then decide to do a heat map.)
+
+
+```{r}
+#| echo: false
+climate |>
+  count(month, name = "protests") |>
+  ggplot(aes(x = month, y = protests)) +
+  geom_col(fill = "#F06BA5", width = 25) +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  labs(
+    x = NULL,
+    y = "Climate protests per month",
+    title = "Climate and environmental protests per month"
+  ) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank())
+
+climate |>
+  count(month, name = "protests") |>
+  ggplot(aes(x = month, y = protests)) +
+  geom_line(color = "#F4B6C8", linewidth = 1) +
+  geom_point(color = "#E0218A", size = 1.8) +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  labs(
+    x = NULL,
+    y = "Climate protests per month",
+    title = "Climate and environmental protests per month"
+  ) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank())
+```
+Although those graph technically shows use the number of protest per month, I personally find it hard to actually read. 
+```{r}
+#| echo: false
+climate |>
+  count(month, name = "protests") |>
+  mutate(
+    year = factor(year(month)),
+    mon  = month(month, label = TRUE)
+  ) |>
+  ggplot(aes(x = mon, y = fct_rev(year), fill = protests)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = protests), size = 3) +
+  scale_fill_gradient(low = "#FFF0F6", high = "#E0218A", name = "Protests") +
+  labs(x = NULL, y = NULL, title = "Climate protests per month") +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+```
+
+I like this heat map, but the colours are similar for the lower protest count months... Lets try to find a solution. Something about capping the gradient so the outliers are not so significantly the only things at the high point of the heat map.
+
+Trying to visualize this data makes me realize I need to figure out the distribution of protest amounts. According to the internet, the best solution for me is to set a cap on the colour range near the 90th to 95th percentile. 
+```{r}
+climate |>
+  count(month, name = "protests") |>
+  pull(protests) |>
+  quantile(c(.1, .25, .5, .75, .9, .95, 1))
+```
+Half of our months have 122 protest or fewer, 90% are under 331, but the upper percentile has 3636!! Lets try setting the cap at the 90th percentile.  This means the top 10% will get the darkest pink, and everything else should be more visible on the heat map. For the record, I am also very curious what happened to make some months such an outlier, but I am going to deal with that later. 
+```{r}
+cap <- 350
+
+climate |>
+  count(month, name = "protests") |>
+  mutate(
+    year = factor(year(month)),
+    mon  = month(month, label = TRUE)
+  ) |>
+  ggplot(aes(x = mon, y = fct_rev(year), fill = protests)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = protests), size = 3) +
+  scale_fill_gradientn(
+    colors = c("#FFF5F9", "#FAC4DA", "#F27BAE", "#E0218A", "#C2185B"),
+    limits = c(0, cap),
+    oob = scales::squish,
+    breaks = c(0, 100, 200, 300, 350),
+    labels = c("0", "100", "200", "300", "350+"),
+    name = "Protests"
+  ) +
+  labs(x = NULL, y = NULL, title = "Climate protests per month") +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+
+```
+This looks nice! And revealed a new concern for me.... What caused these outliers? My American friends beside me have reminded me that, for exmaple, October 2025 is when the American government shut down and many government employees got furloughed, notably a lot of climate-related workers. I need to decide if this event is too much of an outlier for my purposes. I hate nuance!!!
 
 ## Find the protest waves
 
@@ -111,9 +209,16 @@ The Clickstream data starts in late 2017, so my study window begins in December 
 
 
 ```{r}
+#clickstream data needs two months to form a pair so we start in december 2017  
+study_start <- ymd("2017-12-01")
+# the ccc dataset is incomplete fro may 2026 so we are going to go back one month from the last recorded month (may 2026) to esnsure we only use months 
+study_end   <- floor_date(max(climate$date, na.rm = TRUE), "month") %m-% months(1)
+study_end
 
+monthly_window <- monthly |>
+  filter(month >= study_start, month <= study_end)
+
+nrow(monthly_window)
 ```
-
-
 
 
