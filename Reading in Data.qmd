@@ -207,7 +207,6 @@ This looks nice! And revealed a new concern for me.... What caused these outlier
 The Clickstream data starts in late 2017, so my study window begins in December 2017. The last month of CCC data (May 2026) is only partly covered, so the window ends at the last full month. Months with no protests in the data count as zero. A protest wave is a month in the top 10% of monthly counts.
 
 
-
 ```{r}
 #clickstream data needs two months to form a pair so we start in december 2017  
 study_start <- ymd("2017-12-01")
