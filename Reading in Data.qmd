@@ -21,7 +21,7 @@ library(lubridate)
 ```
 ```{r}
 #| echo: false 
-ccc_files <- list.files("data/raw/ccc", pattern = "\\.csv$", full.names = TRUE)
+ccc_files <- list.files("data/raw/ccc", pattern = "\\.csv(\\.gz)?$", full.names = TRUE)
 ccc_files
 ```
 I want to stack the three csv files into one table. 
@@ -202,15 +202,21 @@ climate |>
 ```
 This looks nice! And revealed a new concern for me.... What caused these outliers? My American friends beside me have reminded me that, for exmaple, October 2025 is when the American government shut down and many government employees got furloughed, notably a lot of climate-related workers. I need to decide if this event is too much of an outlier for my purposes. I hate nuance!!!
 
-## Find the protest waves
+--
 
-The Clickstream data starts in late 2017, so my study window begins in December 2017. The last month of CCC data (May 2026) is only partly covered, so the window ends at the last full month. Months with no protests in the data count as zero. A protest wave is a month in the top 10% of monthly counts.
+It is now a few days later and I have decided to keep the large protest days - in short, I believe they represent the complex nature of "climate" related protests. Climate change is not separate from the instituions that enabled unevenly distributed environmental harms in the first place, so the multifacted protests may even aid my analysis by including that complexity outright. 
+
+
+
+## Next step: find the protest waves
+
+The Clickstream data starts in late 2017, so my study window begins in December 2017. The last month of CCC data (May 2026) is only partly covered, so the window ends at the last full month. Every month in the window has at least one protest, so no months needed to be filled in as zero. A protest wave is a month in the top 10% of monthly counts.
 
 
 ```{r}
 #clickstream data needs two months to form a pair so we start in december 2017  
 study_start <- ymd("2017-12-01")
-# the ccc dataset is incomplete fro may 2026 so we are going to go back one month from the last recorded month (may 2026) to esnsure we only use months 
+# the ccc dataset is incomplete fro may 2026 so we are going to go back one month from the last recorded month (may 2026) to ensure we only use months 
 study_end   <- floor_date(max(climate$date, na.rm = TRUE), "month") %m-% months(1)
 study_end
 
@@ -218,6 +224,114 @@ monthly_window <- monthly |>
   filter(month >= study_start, month <= study_end)
 
 nrow(monthly_window)
+wave_cutoff <- quantile(monthly_window$protests, 0.90)
+wave_cutoff
+
+monthly_window <- monthly_window |>
+  mutate(wave = protests >= wave_cutoff)
+
+monthly_window |> count(wave)
+monthly_window |> filter(wave) |> select(month, protests)
 ```
+```{r}
+# full list of wave months (print(n = Inf) shows every row)
+monthly_window |> count(wave)
+monthly_window |> filter(wave) |> select(month, protests) |> print(n = Inf)
+
+# build the before/after pairs
+month_pairs <- monthly_window |>
+  mutate(
+    before_month    = lag(month),
+    before_protests = lag(protests),
+    before_is_wave  = lag(wave)
+  ) |>
+  filter(!is.na(before_month)) |>   # drops Dec 2017, which only serves as a "before"
+  transmute(
+    before_month,
+    after_month    = month,
+    before_protests,
+    after_protests = protests,
+    before_is_wave,
+    pair_type = if_else(wave, "wave", "ordinary")
+  )
+
+count(month_pairs, pair_type)
+month_pairs |> filter(pair_type == "wave") |> count(before_is_wave)
+```
+We have now identified the "wave" months. Some notes:
+- 11 total wave months, with. cutoff of 335 (March 2024)
+- There is only one back to back wave (March and April 2022), meaning we have 10 "ordinary" pairs
+- 4 of the 11 waves are in March, which signals to me that I investigate this pattern (seasonal/spring mobilizations?)
+- 3 of the 11 months are in January, same question as above
+-I also want to check if the CCC's tagging changed over time, as the most extreme waves are also quite recent. This could be because of the political events we spoke about earlier, but I want to make sure it is not an obvious data effect.
+
+## Wave pairs
+```{r}
+#| echo: false
+month_pairs <- monthly_window |>
+  mutate(
+    before_month    = lag(month),
+    before_protests = lag(protests),
+    before_is_wave  = lag(wave)
+  ) |>
+  filter(!is.na(before_month)) |>
+  transmute(
+    before_month,
+    after_month    = month,
+    before_protests,
+    after_protests = protests,
+    before_is_wave,
+    pair_type = if_else(wave, "wave", "ordinary")
+  )
+
+count(month_pairs, pair_type)
+
+#| echo: false
+month_pairs |>
+  filter(pair_type == "wave") |>
+  transmute(
+    `Wave month`       = format(after_month, "%b %Y"),
+    `Month before`     = format(before_month, "%b %Y"),
+    `Protests before`  = before_protests,
+    `Protests in wave` = after_protests,
+    `Change`           = after_protests - before_protests
+  ) |>
+  knitr::kable(
+    format.args = list(big.mark = ","),
+    align = "llrrr",
+    caption = "Each protest wave month compared with the month before it"
+  )
+
+
+
+
+
+
+month_pairs |>
+  filter(pair_type == "wave") |>
+  mutate(label = format(after_month, "%b %Y")) |>
+  select(label, after_month,
+         `Month before` = before_protests,
+         `Wave month`   = after_protests) |>
+  pivot_longer(c(`Month before`, `Wave month`),
+               names_to = "type", values_to = "protests") |>
+  ggplot(aes(x = protests,
+             y = fct_reorder(label, after_month, .desc = TRUE),
+             fill = type)) +
+  geom_col(position = position_dodge(width = 0.9)) +
+  geom_text(aes(label = protests),
+            position = position_dodge(width = 0.9),
+            hjust = -0.2, size = 3) +
+  scale_fill_manual(values = c("Wave month" = "#E0218A",
+                               "Month before" = "#F8BBD6"),
+                    name = NULL) +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.1))) +
+  labs(x = "Climate protests", y = NULL,
+       title = "Protest wave months and the month before each") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+
 
 
