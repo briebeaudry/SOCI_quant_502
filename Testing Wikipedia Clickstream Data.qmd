@@ -1,0 +1,74 @@
+---
+title: "Testing Wikipedia Clickstream Data"
+format: html
+---
+
+Time for step two, which is looking at the clickstream data from wikipedia. 
+
+```{r}
+#| echo: false
+library(tidyverse)
+library(lubridate)
+```
+
+
+```{r}
+dir.create("data/raw/clickstream", recursive = TRUE, showWarnings = FALSE)
+options(timeout = 3600)
+
+download.file(
+  "https://dumps.wikimedia.org/other/clickstream/2019-09/clickstream-enwiki-2019-09.tsv.gz",
+  destfile = "data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz",
+  mode = "wb"
+)
+
+file.size("data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz") / 1e6
+```
+```{r}
+read_tsv(
+  "data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz",
+  col_names = c("prev", "curr", "type", "n"),
+  col_types = "cccd",
+  n_max = 20,
+  quote = ""
+)
+climate_clicks <- read_tsv_chunked(
+  "data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz",
+  callback = DataFrameCallback$new(
+    function(x, pos) filter(x, prev == "Climate_change")
+  ),
+  chunk_size = 1e6,
+  col_names = c("prev", "curr", "type", "n"),
+  col_types = "cccd",
+  quote = ""
+)
+
+nrow(climate_clicks)
+climate_clicks |> arrange(desc(n)) |> slice_head(n = 10)
+```
+Thoughts;
+
+Climate_change sends 12085 readers to the Global_warming, and this data is from 2019... what was the phenomenon of broad climatic pattern change due to anthropocentric influence called then? Was it more commonly known as "global warming?" 
+
+Yes! I have googled this query and a formal "requested move" discussion opened on the article's discussion page to change the title from Global Warming to Climate Change. The official page move occured on August 21, 2020. Lets try that last chunk again, but filtering for Global_warming as the starting page.
+
+Therefore, March 2020 wave and earlier will be Global_warming, Nov 2020 wave and after will be Climate_change. 
+
+```{r}
+gw_clicks <- read_tsv_chunked(
+  "data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz",
+  callback = DataFrameCallback$new(
+    function(x, pos) filter(x, prev == "Global_warming")
+  ),
+  chunk_size = 1e6,
+  col_names = c("prev", "curr", "type", "n"),
+  col_types = "cccd",
+  quote = ""
+)
+
+nrow(gw_clicks)
+gw_clicks |> arrange(desc(n)) |> slice_head(n = 10)
+    
+```
+
+This makes more sense! For the purposes of this project, I am going to direct from Global_Warming for anything before August 21, 2020, and from Climate_change after that date. I am sure this title change has an effect on the top ten destination pages, but I suppose all we can do is push on and see what the data looks like before making any more choices on that matter. 
