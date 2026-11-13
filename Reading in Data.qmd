@@ -331,7 +331,124 @@ month_pairs |>
   theme_minimal() +
   theme(legend.position = "bottom")
 ```
+Now we are going to pick our non-wave pairs. I have decided to pick these based on similar seasonality to the wave pairs, as the data visualization has showed trends that indicate the time of year impacts the number of climate-related protests.
 
+```{r}
+#| echo: false
+# the wave pairs, with the calendar month and year of each "after" month
+wave_pairs <- month_pairs |>
+  filter(pair_type == "wave") |>
+  mutate(cal_month = month(after_month), yr = year(after_month))
+
+# candidate ordinary pairs: calm before AND after months
+candidates <- month_pairs |>
+  filter(pair_type == "ordinary", !before_is_wave) |>
+  filter(!after_month %in% wave_pairs$before_month) |>   # skip months right before a wave
+  mutate(cal_month = month(after_month), yr = year(after_month))
+
+# for each wave pair, pick the closest-in-time candidate with the same calendar month
+matched <- list()
+used <- c()
+
+for (i in seq_len(nrow(wave_pairs))) {
+  w <- wave_pairs[i, ]
+
+  pick <- candidates |>
+    filter(cal_month == w$cal_month, !after_month %in% used) |>
+    mutate(gap = abs(yr - w$yr)) |>
+    arrange(gap, yr) |>
+    slice(1)
+
+  used <- c(used, pick$after_month)
+  matched[[i]] <- bind_cols(
+    wave_after   = w$after_month,
+    match_before = pick$before_month,
+    match_after  = pick$after_month
+  )
+}
+
+matched_pairs <- bind_rows(matched)
+matched_pairs
+```
+A wave pair is meant to compare a baseline month with a wave month. One of my 11 wave pairs doesn't have a baseline: April 2022 is a wave month, but the month before it, March 2022, is also a wave month. Wikipedia attention in March 2022 may already be elevated by the same protest activity, so the "before" month isn't a clean comparison. I dropped this pair, which leaves 10 wave pairs. March 2022 is still included as a wave month in its own pair (February to March 2022), so this stretch of heightened protest activity is still represented. I'll match 10 non-wave pairs to these 10 wave pairs.
+```{r}
+#| echo: false
+# the wave pair whose "before" month is also a wave month
+month_pairs |>
+  filter(pair_type == "wave", before_is_wave) |>
+  select(before_month, after_month, before_protests, after_protests)
+
+# keep the 10 wave pairs with a non-wave "before" month
+wave_pairs <- month_pairs |>
+  filter(pair_type == "wave", !before_is_wave) |>
+  mutate(cal_month = month(after_month), yr = year(after_month))
+
+nrow(wave_pairs)
+```
+
+```{r}
+#| echo: false
+# months right before ANY wave, so they are not used as non-wave pairs
+before_wave_months <- month_pairs |>
+  filter(pair_type == "wave") |>
+  pull(before_month)
+
+# candidate non-wave pairs: calm before AND after month, not right before a wave
+candidates <- month_pairs |>
+  filter(pair_type == "ordinary", !before_is_wave,
+         !after_month %in% before_wave_months) |>
+  mutate(cal_month = month(after_month), yr = year(after_month))
+
+# for each wave pair, pick the closest-in-time candidate with the same calendar month
+matches <- vector("list", nrow(wave_pairs))
+used <- as.Date(character())
+
+for (i in seq_len(nrow(wave_pairs))) {
+  w <- wave_pairs[i, ]
+  matches[[i]] <- candidates |>
+    filter(cal_month == w$cal_month, !after_month %in% used) |>
+    mutate(gap = abs(yr - w$yr)) |>
+    arrange(gap, yr) |>
+    slice(1) |>
+    mutate(pair_no = i)
+  used <- c(used, matches[[i]]$after_month)
+}
+
+# one table: each wave pair followed by its matched non-wave pair
+pair_table <- bind_rows(
+  wave_pairs |> mutate(pair_no = row_number(), Type = "Wave"),
+  bind_rows(matches) |> mutate(Type = "Non-wave")
+) |>
+  mutate(Type = factor(Type, levels = c("Wave", "Non-wave"))) |>
+  arrange(pair_no, Type) |>
+  transmute(
+    Pair               = pair_no,
+    Type,
+    `Before month`     = format(before_month, "%b %Y"),
+    `After month`      = format(after_month, "%b %Y"),
+    `Protests before`  = before_protests,
+    `Protests after`   = after_protests
+  )
+
+pair_table |>
+  knitr::kable(
+    format.args = list(big.mark = ","),
+    align = "cllrr",
+    caption = "Each wave pair and the non-wave pair matched to it"
+  )
+```
+```{r}
+#| echo: false
+needed_months <- bind_rows(wave_pairs, bind_rows(matches)) |>
+  select(before_month, after_month) |>
+  pivot_longer(everything(), values_to = "month") |>
+  distinct(month) |>
+  arrange(month) |>
+  mutate(file = paste0("clickstream-enwiki-", format(month, "%Y-%m"), ".tsv.gz"))
+
+nrow(needed_months)
+needed_months
+```
 
 
 
