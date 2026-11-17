@@ -389,7 +389,29 @@ download.file(
 )
 
 file.size("data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz") / 1e6
+read_tsv(
+  "data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz",
+  col_names = c("prev", "curr", "type", "n"),
+  col_types = "cccd",
+  n_max = 20,
+  quote = ""
+)
+climate_clicks <- read_tsv_chunked(
+  "data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz",
+  callback = DataFrameCallback$new(
+    function(x, pos) filter(x, prev == "Climate_change") # filter to show climate change homepage
+  ),
+  chunk_size = 1e6,
+  col_names = c("prev", "curr", "type", "n"),
+  col_types = "cccd",
+  quote = ""
+)
+
+nrow(climate_clicks)
+climate_clicks |> arrange(desc(n)) |> slice_head(n = 10)
 ```
+
+
 
 
 

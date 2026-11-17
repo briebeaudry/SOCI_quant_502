@@ -784,8 +784,87 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>YAY!</p>
 <p>Now we know what wikipedia data we are going to download.</p>
 </section>
-<section id="section" class="level2">
-<h2 class="anchored" data-anchor-id="section"></h2>
+<section id="wikipedia-clickstream-data" class="level2">
+<h2 class="anchored" data-anchor-id="wikipedia-clickstream-data">Wikipedia Clickstream Data</h2>
+<p>Before I go ahead and download one million mb of clickstream data, lets download one month and test out our data cleaning.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb49"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(<span class="st">"data/raw/clickstream"</span>, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">timeout =</span> <span class="dv">3600</span>)</span>
+<span id="cb49-3"><a href="#cb49-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb49-4"><a href="#cb49-4" aria-hidden="true" tabindex="-1"></a><span class="fu">download.file</span>(</span>
+<span id="cb49-5"><a href="#cb49-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"https://dumps.wikimedia.org/other/clickstream/2019-09/clickstream-enwiki-2019-09.tsv.gz"</span>,</span>
+<span id="cb49-6"><a href="#cb49-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">destfile =</span> <span class="st">"data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz"</span>,</span>
+<span id="cb49-7"><a href="#cb49-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">mode =</span> <span class="st">"wb"</span></span>
+<span id="cb49-8"><a href="#cb49-8" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb49-9"><a href="#cb49-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb49-10"><a href="#cb49-10" aria-hidden="true" tabindex="-1"></a><span class="fu">file.size</span>(<span class="st">"data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz"</span>) <span class="sc">/</span> <span class="fl">1e6</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 385.1643</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb51"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a><span class="fu">read_tsv</span>(</span>
+<span id="cb51-2"><a href="#cb51-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">"data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz"</span>,</span>
+<span id="cb51-3"><a href="#cb51-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">col_names =</span> <span class="fu">c</span>(<span class="st">"prev"</span>, <span class="st">"curr"</span>, <span class="st">"type"</span>, <span class="st">"n"</span>),</span>
+<span id="cb51-4"><a href="#cb51-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">col_types =</span> <span class="st">"cccd"</span>,</span>
+<span id="cb51-5"><a href="#cb51-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">n_max =</span> <span class="dv">20</span>,</span>
+<span id="cb51-6"><a href="#cb51-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">quote =</span> <span class="st">""</span></span>
+<span id="cb51-7"><a href="#cb51-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 20 × 4
+   prev                      curr     type         n
+   &lt;chr&gt;                     &lt;chr&gt;    &lt;chr&gt;    &lt;dbl&gt;
+ 1 Dave_Lister               Vindaloo link        33
+ 2 other-internal            Vindaloo external   347
+ 3 Goa                       Vindaloo link        77
+ 4 List_of_goat_dishes       Vindaloo link        20
+ 5 Food_history              Vindaloo link        12
+ 6 Grounded_Vindaloop        Vindaloo link        72
+ 7 Goan_cuisine              Vindaloo link        98
+ 8 other-empty               Vindaloo external  2093
+ 9 Phall                     Vindaloo link       339
+10 India                     Vindaloo link       134
+11 Indian_cuisine            Vindaloo link        59
+12 Spice_mix                 Vindaloo link        73
+13 Spiedie                   Vindaloo other       10
+14 Butter_chicken            Vindaloo link        10
+15 Vindaloo_(song)           Vindaloo link        42
+16 Vindaloo_(disambiguation) Vindaloo link        11
+17 Main_Page                 Vindaloo other       90
+18 Madras_curry_sauce        Vindaloo other       11
+19 Chicken_tikka_masala      Vindaloo link        23
+20 other-other               Vindaloo external    13</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb53"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a>climate_clicks <span class="ot">&lt;-</span> <span class="fu">read_tsv_chunked</span>(</span>
+<span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">"data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz"</span>,</span>
+<span id="cb53-3"><a href="#cb53-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">callback =</span> DataFrameCallback<span class="sc">$</span><span class="fu">new</span>(</span>
+<span id="cb53-4"><a href="#cb53-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">function</span>(x, pos) <span class="fu">filter</span>(x, prev <span class="sc">==</span> <span class="st">"Climate_change"</span>) <span class="co"># filter to show climate change homepage</span></span>
+<span id="cb53-5"><a href="#cb53-5" aria-hidden="true" tabindex="-1"></a>  ),</span>
+<span id="cb53-6"><a href="#cb53-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">chunk_size =</span> <span class="fl">1e6</span>,</span>
+<span id="cb53-7"><a href="#cb53-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">col_names =</span> <span class="fu">c</span>(<span class="st">"prev"</span>, <span class="st">"curr"</span>, <span class="st">"type"</span>, <span class="st">"n"</span>),</span>
+<span id="cb53-8"><a href="#cb53-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">col_types =</span> <span class="st">"cccd"</span>,</span>
+<span id="cb53-9"><a href="#cb53-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">quote =</span> <span class="st">""</span></span>
+<span id="cb53-10"><a href="#cb53-10" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb53-11"><a href="#cb53-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb53-12"><a href="#cb53-12" aria-hidden="true" tabindex="-1"></a><span class="fu">nrow</span>(climate_clicks)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 329</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb55"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a>climate_clicks <span class="sc">|&gt;</span> <span class="fu">arrange</span>(<span class="fu">desc</span>(n)) <span class="sc">|&gt;</span> <span class="fu">slice_head</span>(<span class="at">n =</span> <span class="dv">10</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 10 × 4
+   prev           curr                                 type      n
+   &lt;chr&gt;          &lt;chr&gt;                                &lt;chr&gt; &lt;dbl&gt;
+ 1 Climate_change Global_warming                       link  13085
+ 2 Climate_change Climate_system                       link   1557
+ 3 Climate_change Human_impact_on_the_environment      link   1521
+ 4 Climate_change Attribution_of_recent_climate_change link   1046
+ 5 Climate_change Earth's_energy_budget                link   1043
+ 6 Climate_change Hyphen-minus                         other   719
+ 7 Climate_change Paleoclimatology                     link    707
+ 8 Climate_change Geologic_temperature_record          link    612
+ 9 Climate_change El_Niño–Southern_Oscillation         link    583
+10 Climate_change Index_of_climate_change_articles     link    529</code></pre>
+</div>
+</div>
 </section>
 
 </main>

@@ -1,5 +1,5 @@
 ---
-title: "Milestone Two"
+title: "MilestoneTwo"
 format: html
 ---
 
@@ -51,6 +51,8 @@ sum(is.na(ccc_raw$topic))
 ccc_raw |> count(topic, sort = TRUE) |> head(20)
 sum(is.na(ccc_raw$topic))
 
+# events with no topic at all are dropped implicitly here: str_detect() on NA
+# returns NA, and filter() discards NA rows
 climate <- ccc_raw |>
   filter(str_detect(str_to_lower(topic), "environment|climate"))
 
@@ -65,9 +67,11 @@ ccc_raw |>
   mutate(year = str_sub(date, 1, 4)) |>
   count(year)
 
-mean(is.na(ccc_raw$topic))
+untagged_share <- mean(is.na(ccc_raw$topic))
+untagged_share
 ```
-The untagged events (2.4%) are evenly distributed across all years, so I make the choice to drop them. 
+
+The untagged events (`r scales::percent(untagged_share, accuracy = 0.1)`) are evenly distributed across all years, so I make the choice to drop them. 
 
 We now count how many climate/environmental protests happened in each month. As a reminder, we are looking at all of the data to find months in the top 10% of monthly protest counts. We will use these to build protest waves. 
 
@@ -100,6 +104,19 @@ monthly <-
   count(month, name = "protests")
 monthly |> arrange(month)
 head(10)
+```
+```{r}
+#| label: test-1-ccc-data
+#| echo: true
+#TEST 1: CCC data loaded and parsed
+stopifnot(
+  "expected 3 CCC files"            = length(ccc_files) == 3,
+  "key columns are missing"         = all(c("date", "locality", "state", "issues") %in% names(ccc_raw)),
+  "5% or more events are untagged"  = untagged_share < 0.05,
+  "1% or more dates failed to parse" = mean(is.na(climate$date)) < 0.01
+)
+
+
 ```
 
 Yay! Now we can visualize our data. Previously, I tried histograms and bar graphs, but found this data best visualized in a heat map. Lets take a look at that process.
@@ -217,12 +234,25 @@ month_pairs <- monthly_window |>
 count(month_pairs, pair_type)
 month_pairs |> filter(pair_type == "wave") |> count(before_is_wave)
 ```
+```{r}
+#| label: test-2-window
+#| echo: true
+#  TEST 2: study window is complete and gap-free
+expected_months <- seq(study_start, study_end, by = "month")
+stopifnot(
+  "window does not end Apr 2026"  = study_end == ymd("2026-04-01"),
+  "window has the wrong number of months" = nrow(monthly_window) == length(expected_months),
+  "window has a missing month"    = all(monthly_window$month == expected_months),
+  "window has a zero-protest month" = all(monthly_window$protests >= 1)
+)
+
+```
 We have now identified the "wave" months. Some notes:
-- 11 total wave months, with. cutoff of 335 (March 2024)
+- `r sum(monthly_window$wave)` total wave months, with a cutoff of `r round(unname(wave_cutoff))` protests per month
 - There is only one back to back wave (March and April 2022), meaning we have 10 "ordinary" pairs
 - 4 of the 11 waves are in March, which signals to me that I investigate this pattern (seasonal/spring mobilizations?)
 - 3 of the 11 months are in January, same question as above
--I also want to check if the CCC's tagging changed over time, as the most extreme waves are also quite recent. This could be because of the political events we spoke about earlier, but I want to make sure it is not an obvious data effect.
+- I also want to check if the CCC's tagging changed over time, as the most extreme waves are also quite recent. This could be because of the political events we spoke about earlier, but I want to make sure it is not an obvious data effect.
 
 ```{r}
 #| echo: false
@@ -265,6 +295,7 @@ month_pairs |>
 
 Now we are going to pick our non-wave pairs. I have decided to pick these based on similar seasonality to the wave pairs, as the data visualization has showed trends that indicate the time of year impacts the number of climate-related protests.
 
+A wave pair is meant to compare a baseline month with a wave month. One of my 11 wave pairs doesn't have a baseline: April 2022 is a wave month, but the month before it, March 2022, is also a wave month. Wikipedia attention in March 2022 may already be elevated by the same protest activity, so the "before" month isn't a clean comparison. I dropped this pair, which leaves 10 wave pairs. March 2022 is still included as a wave month in its own pair (February to March 2022), so this stretch of heightened protest activity is still represented. I'll match 10 non-wave pairs to these 10 wave pairs.
 ```{r}
 #| echo: false
 # the wave pairs, with the calendar month and year of each "after" month
@@ -302,7 +333,7 @@ for (i in seq_len(nrow(wave_pairs))) {
 matched_pairs <- bind_rows(matched)
 matched_pairs
 ```
-A wave pair is meant to compare a baseline month with a wave month. One of my 11 wave pairs doesn't have a baseline: April 2022 is a wave month, but the month before it, March 2022, is also a wave month. Wikipedia attention in March 2022 may already be elevated by the same protest activity, so the "before" month isn't a clean comparison. I dropped this pair, which leaves 10 wave pairs. March 2022 is still included as a wave month in its own pair (February to March 2022), so this stretch of heightened protest activity is still represented. I'll match 10 non-wave pairs to these 10 wave pairs.
+
 
 ```{r}
 #| echo: false
@@ -369,12 +400,13 @@ pair_table |>
     caption = "Each wave pair and the non-wave pair matched to it"
   )
 ```
-
 YAY!
 
 Now we know what wikipedia data we are going to download.
 
 ## Wikipedia Clickstream Data
+
+### Testing
 
 Before I go ahead and download one million mb of clickstream data, lets download one month and test out our data cleaning.
 
@@ -389,7 +421,52 @@ download.file(
 )
 
 file.size("data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz") / 1e6
+read_tsv(
+  "data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz",
+  col_names = c("prev", "curr", "type", "n"),
+  col_types = "cccd",
+  n_max = 20,
+  quote = ""
+)
+climate_clicks <- read_tsv_chunked(
+  "data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz",
+  callback = DataFrameCallback$new(
+    function(x, pos) filter(x, prev == "Climate_change") # filter to show climate change homepage
+  ),
+  chunk_size = 1e6,
+  col_names = c("prev", "curr", "type", "n"),
+  col_types = "cccd",
+  quote = ""
+)
+
+nrow(climate_clicks)
+climate_clicks |> arrange(desc(n)) |> slice_head(n = 10)
 ```
+
+Climate_change sends 12085 readers to the Global_warming, and this data is from 2019... what was the phenomenon of broad climatic pattern change due to anthropocentric influence called then? Was it more commonly known as "global warming?" 
+
+Yes! I have googled this query and a formal "requested move" discussion opened on the article's discussion page to change the title from Global Warming to Climate Change. The official page move occured on August 21, 2020. Lets try that last chunk again, but filtering for Global_warming as the starting page.
+
+Therefore, March 2020 wave and earlier will be Global_warming, Nov 2020 wave and after will be Climate_change. 
+
+```{r}
+gw_clicks <- read_tsv_chunked(
+  "data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz",
+  callback = DataFrameCallback$new(
+    function(x, pos) filter(x, prev == "Global_warming")
+  ),
+  chunk_size = 1e6,
+  col_names = c("prev", "curr", "type", "n"),
+  col_types = "cccd",
+  quote = ""
+)
+
+nrow(gw_clicks)
+gw_clicks |> arrange(desc(n)) |> slice_head(n = 10)
+```
+
+This makes more sense! For the purposes of this project, I am going to direct from Global_Warming for anything before August 21, 2020, and from Climate_change after that date. I am sure this title change has an effect on the top ten destination pages, but I suppose all we can do is push on and see what the data looks like before making any more choices on that matter. 
+
 
 
 
