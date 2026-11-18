@@ -14,7 +14,6 @@ Raw CCC protest data are in `data/raw/ccc/`, downloaded from the CCC website htt
 - Events with no topic (~2.4%) were dropped. Only "environment" or "climate" events were kept, then counted per month.
 - A **protest wave** is a month in the top 10% of monthly counts (an arbitrary cutoff; sensitivity tests are a next step).
 - The study window runs from December 2017 to the last full month of CCC data.
-- A few extreme outlier months remain unresolved. The heat map colour scale is capped at 350 so the other months stay readable.
 
 ## Wikipedia Data
 
