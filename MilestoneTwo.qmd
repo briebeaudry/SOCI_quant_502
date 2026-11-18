@@ -3,7 +3,7 @@ title: "MilestoneTwo"
 format: html
 ---
 
-For Milestone #2, I want to communicate where the culmination of my weekly output has gotten me. At this point, I have identified my protest waves, and began to download/clean my wikipedia data. Lets take a look:
+For Milestone #2, I want to communicate where the culmination of my weekly output has gotten me. At this point, I have identified my protest waves, downloaded and cleaned my wikipedia data, and began to do some exploratory data analysis on the relationships between the protest waves and the wikipedia clickstream. Before we start, I wanted to flag that my last graphs use the package ggfx(see my read me). If ggfx is not installed, the notebook still renders and those graphs are drawn normally. You will see why I wanted it! :)
 
 ## Reading in Protest Data
 
@@ -14,11 +14,15 @@ The CCC data comes in three time periods, so the first step was to combine them 
 library(tidyverse)
 library(lubridate)
 ```
+
+This is the cleaning code for the CCC protest data. It reads all three files, stacks them, and builds one `topic` column.
+
 ```{r}
-#| echo: false 
+# find the three CCC files
 ccc_files <- list.files("data/raw/ccc", pattern = "\\.csv(\\.gz)?$", full.names = TRUE)
 ccc_files
 
+# read every file as text, lower-case the column names, and stack them
 ccc_raw <- ccc_files |>
   map(\(f) read_csv(f, col_types = cols(.default = col_character())) |>
         rename_with(tolower)) |>
@@ -32,8 +36,6 @@ ccc_raw |>
   head()
 
 # At this point, I realized that the different time periods of data collection named a column measuring the same thing different names. At time of writing this I am still annoyed about that :)
-
-#| echo: false 
 ccc_raw |>
   summarise(
     issues       = sum(!is.na(issues)),
@@ -42,15 +44,17 @@ ccc_raw |>
     total_rows   = n()
   )
 
+# combine the three differently named columns into one "topic" column
+# (coalesce takes the first non-missing value of the three)
 ccc_raw <- 
   ccc_raw |>
   mutate(topic = coalesce(issue_tags, issues, issue_tags_summary))
 
-sum(is.na(ccc_raw$topic))
+sum(is.na(ccc_raw$topic))   # events with no topic at all
 
 ccc_raw |> count(topic, sort = TRUE) |> head(20)
-sum(is.na(ccc_raw$topic))
 
+# keep only events tagged with environment or climate
 # events with no topic at all are dropped implicitly here: str_detect() on NA
 # returns NA, and filter() discards NA rows
 climate <- ccc_raw |>
@@ -61,7 +65,7 @@ climate |> count(topic, sort = TRUE) |> head(15)
 ```
 At this point, I realized there were some events that were untagged. We will now do a test to interrogate the distribution of untagged events. 
 ```{r}
-#| echo: false 
+# how many untagged events are there in each year?
 ccc_raw |>
   filter(is.na(topic)) |>
   mutate(year = str_sub(date, 1, 4)) |>
@@ -71,12 +75,13 @@ untagged_share <- mean(is.na(ccc_raw$topic))
 untagged_share
 ```
 
-The untagged events (`r scales::percent(untagged_share, accuracy = 0.1)`) are evenly distributed across all years, so I make the choice to drop them. 
+The untagged events (`r scales::percent(untagged_share, accuracy = 0.1)`) show up in every year, although more of them are in 2017 and 2018 than in later years. Because they are such a small share of the data, I make the choice to drop them. 
 
 We now count how many climate/environmental protests happened in each month. As a reminder, we are looking at all of the data to find months in the top 10% of monthly protest counts. We will use these to build protest waves. 
 
 ```{r}
-#| echo: false 
+# the dates come in two formats, so try year-month-day first, then month-day-year
+# then round each date down to the first day of its month
 climate <- 
   climate |>
   mutate(
@@ -86,24 +91,13 @@ climate <-
 
 nrow(climate)
 range(climate$date, na.rm = TRUE)
-sum(is.na(climate$date))
+sum(is.na(climate$date))   # dates that failed to parse
 
-
-climate <- climate |>
-  mutate(
-    date  = as_date(parse_date_time(date, orders = c("ymd", "mdy"))),
-    month = floor_date(date, "month")
-  )
-
-nrow(climate)
-range(climate$date, na.rm = TRUE)
-sum(is.na(climate$date))
-
+# number of climate protests per month
 monthly <-
   climate |>
   count(month, name = "protests")
 monthly |> arrange(month)
-head(10)
 ```
 ```{r}
 #| label: test-1-ccc-data
@@ -194,7 +188,7 @@ The Clickstream data starts in late 2017, so my study window begins in December 
 ```{r}
 #clickstream data needs two months to form a pair so we start in december 2017  
 study_start <- ymd("2017-12-01")
-# the ccc dataset is incomplete fro may 2026 so we are going to go back one month from the last recorded month (may 2026) to ensure we only use months 
+# the ccc dataset is incomplete for may 2026 so we are going to go back one month from the last recorded month (may 2026) to ensure we only use full months 
 study_end   <- floor_date(max(climate$date, na.rm = TRUE), "month") %m-% months(1)
 study_end
 
@@ -205,13 +199,12 @@ nrow(monthly_window)
 wave_cutoff <- quantile(monthly_window$protests, 0.90)
 wave_cutoff
 
+# a wave month is any month at or above the 90th percentile
 monthly_window <- monthly_window |>
   mutate(wave = protests >= wave_cutoff)
 
 monthly_window |> count(wave)
-monthly_window |> filter(wave) |> select(month, protests)
 # full list of wave months (print(n = Inf) shows every row)
-monthly_window |> count(wave)
 monthly_window |> filter(wave) |> select(month, protests) |> print(n = Inf)
 
 # build the before/after pairs
@@ -247,7 +240,26 @@ stopifnot(
 )
 
 ```
+Here is a first exploratory graph of the protest data: climate protests per month, with the wave months highlighted.
+```{r}
+#| label: exploratory-graph-protests
+monthly_window |>
+  ggplot(aes(month, protests, fill = wave)) +
+  geom_col() +
+  scale_fill_manual(
+    values = c("grey70", "#E0218A"),
+    labels = c("Ordinary month", "Wave month"),
+    name = NULL
+  ) +
+  labs(
+    x = NULL, y = "Number of protests",
+    title = "Climate protests per month",
+    subtitle = "Wave months are the top 10% of monthly counts"
+  ) +
+  theme_minimal()
+```
 We have now identified the "wave" months. Some notes:
+
 - `r sum(monthly_window$wave)` total wave months, with a cutoff of `r round(unname(wave_cutoff))` protests per month
 - There is only one back to back wave (March and April 2022), meaning we have 10 "ordinary" pairs
 - 4 of the 11 waves are in March, which signals to me that I investigate this pattern (seasonal/spring mobilizations?)
@@ -274,7 +286,6 @@ month_pairs <- monthly_window |>
 
 count(month_pairs, pair_type)
 
-#| echo: false
 month_pairs |>
   filter(pair_type == "wave") |>
   transmute(
@@ -402,13 +413,12 @@ pair_table |>
 ```
 YAY!
 
-Now we know what wikipedia data we are going to download.
 
 ## Wikipedia Clickstream Data
 
 ### Testing
 
-Before I go ahead and download one million mb of clickstream data, lets download one month and test out our data cleaning.
+Before I go ahead and download one million mb of clickstream data, lets download one month and test out our data cleaning. (This exploratory code is not run when the document renders, since it downloads a large file.)
 
 ```{r}
 #| eval: false
@@ -444,7 +454,7 @@ nrow(climate_clicks)
 climate_clicks |> arrange(desc(n)) |> slice_head(n = 10)
 ```
 
-Climate_change sends 12085 readers to the Global_warming, and this data is from 2019... what was the phenomenon of broad climatic pattern change due to anthropocentric influence called then? Was it more commonly known as "global warming?" 
+Climate_change sends 13,085 readers to the Global_warming, and this data is from 2019... what was the phenomenon of broad climatic pattern change due to anthropocentric influence called then? Was it more commonly known as "global warming?" 
 
 Yes! I have googled this query and a formal "requested move" discussion opened on the article's discussion page to change the title from Global Warming to Climate Change. The official page move occured on August 21, 2020. Lets try that last chunk again, but filtering for Global_warming as the starting page.
 
@@ -508,49 +518,40 @@ message("TEST 3 passed: needed months are inside the study window and none strad
 
 ## The Big Download
 
-We are going to handle one month of clickstream data at a time. We will download, filter to the source page, save the filtered result, then delete the raw file. I have figured out the best way to do this is to write the download function once, then loop it over all of needed_months in a background job using a separate R script. It is called download_clickstream.r.
-
-We first test the script on one month to make sure it does what we want.
+We are going to handle one month of clickstream data at a time. We will download, filter to the source page, save the filtered result, then delete the raw file. I have figured out the best way to do this is to write the download function once, then loop it over all of needed_months in a background job using a separate R script. It is called download_clickstream.R, and this is the cleaning script, shown in full below.
 
 ```{r}
-#| label: download-function
+#| label: show-cleaning-script
+#| echo: false
+#| results: asis
+# prints the real script (download_clickstream.R) so the notebook always shows
+# exactly the code that produced the data
+fence <- strrep("`", 3)
+cat(fence, "r\n", paste(readLines("download_clickstream.R"), collapse = "\n"), "\n", fence, "\n", sep = "")
+```
 
-dir.create("data/raw/clickstream", recursive = TRUE, showWarnings = FALSE)
+The chunk below saves the month list for the script, then runs the script **only if some months are missing**. On my computer all 40 months were already saved, so rendering skips the download. If someone renders this from a fresh copy without the saved data, it downloads whatever is missing (this takes a long time).
+
+```{r}
+#| label: run-cleaning-script
 dir.create("data/processed/clickstream", recursive = TRUE, showWarnings = FALSE)
-options(timeout = 3600)
+saveRDS(needed_months, "data/processed/needed_months.rds")
 
-get_clicks <- function(ym, file, url, source_page) {
-  out_path <- paste0("data/processed/clickstream/", ym, ".rds")
+n_saved <- length(list.files("data/processed/clickstream", pattern = "\\.rds$"))
+n_saved   # how many months are already saved
 
-  # skip months we've already processed
-  if (file.exists(out_path)) return(invisible(readRDS(out_path)))
-
-  raw_path <- file.path("data/raw/clickstream", file)
-  download.file(url, destfile = raw_path, mode = "wb", quiet = TRUE)
-
-  result <- read_tsv_chunked(
-    raw_path,
-    callback = DataFrameCallback$new(
-      function(x, pos) filter(x, prev == source_page)
-    ),
-    chunk_size = 1e6,
-    col_names = c("prev", "curr", "type", "n"),
-    col_types = "cccd",
-    quote = ""
-  ) |>
-    mutate(month = ymd(paste0(ym, "-01")))
-
-  saveRDS(result, out_path)
-  file.remove(raw_path)   # free the disk space
-  invisible(result)
+if (n_saved < nrow(needed_months)) {
+  source("download_clickstream.R")
 }
 ```
+
+We first check that the saved result for the first month looks right.
 
 ```{r}
 #| label: test-one-month
 
 first <- needed_months[1, ]
-test_clicks <- get_clicks(first$ym, first$file, first$url, first$source_page)
+test_clicks <- readRDS(paste0("data/processed/clickstream/", first$ym, ".rds"))
 
 nrow(test_clicks)
 test_clicks |> arrange(desc(n)) |> slice_head(n = 10)
@@ -558,16 +559,17 @@ test_clicks |> arrange(desc(n)) |> slice_head(n = 10)
 
 ```{r}
 #| label: test-4-one-month
-# TEST 4: one month downloaded and filtered correctly
+# TEST 4: the first month was filtered and saved correctly
 stopifnot(
   "no rows came back"            = nrow(test_clicks) > 0,
   "wrong source page in results" = all(test_clicks$prev == first$source_page),
+  "wrong month in results"       = all(test_clicks$month == first$month),
   "raw file was not deleted"     = !file.exists(file.path("data/raw/clickstream", first$file)),
   "processed file was not saved" = file.exists(paste0("data/processed/clickstream/", first$ym, ".rds"))
 )
-message("TEST 4 passed: one month downloaded, filtered, saved and cleaned up")
+message("TEST 4 passed: first month filtered, saved and cleaned up")
 ```
-Ok, this seems to have worked and passed the test. Time to download all the files. Brace yourself
+Ok, this seems to have worked and passed the test. Time to load all the files. 
 ```{r}
 #| label: load-all-months
 
@@ -594,13 +596,127 @@ stopifnot(
 )
 message("TEST 5 passed: all months downloaded, filtered and cleaned up")
 ```
+
 ```{r}
-length(list.files("data/processed/clickstream", pattern = "\\.rds$"))
-saveRDS(needed_months, "data/processed/needed_months.rds")
+#| label: test-6-click-values
+# TEST 6: the click data itself is sane
+stopifnot(
+  "only the two source pages should appear" = all(all_clicks$prev %in% c("Global_warming", "Climate_change")),
+  "a click count is missing or not positive" = all(!is.na(all_clicks$n) & all_clicks$n > 0),
+  "a row is duplicated within a month"       = !any(duplicated(select(all_clicks, month, prev, curr, type)))
+)
+message("TEST 6 passed: only the two source pages, all click counts are positive, no duplicate rows")
 ```
 
 
+Wow. It feels like we would never get here. But we have our wikipedia data cleaned. Lets explore!
+
+```{r}
+link_clicks <- all_clicks |> filter(type == "link") # filters for only article to article clicks
+ 
+link_clicks |>
+  group_by(curr) |>
+  summarise(total = sum(n)) |>
+  slice_max(total, n = 10) # top ten destinations
+
+link_clicks |>
+  group_by(prev, curr) |>
+  summarise(total = sum(n)) |>
+  slice_max(total, n = 10) # top ten for each source page
 
 
+month_totals <- link_clicks |>
+  group_by(month) |>
+  summarise(total = sum(n)) # total clicks per month
+```
+Lets use this preliminary investigation of the wikipedia to practice making data visualizations. The end goal remains to be comparing the change in top ten destinations during wave vs non wave months, but I need to practice my R skills before digging into that.
+```{r}
+top10 <- link_clicks |>
+  group_by(prev, curr) |>
+  summarise(total = sum(n)) |>
+  slice_max(total, n = 10)
+top10 <- top10 |> mutate(curr = fct_reorder(curr, total))
 
+ggplot(top10, aes(x = total, y = curr)) +
+  geom_col(fill = "#E0218A") +
+  facet_wrap(~prev, scales = "free_y") +
+  scale_x_continuous(labels = scales::comma, n.breaks = 4) +
+  labs(x = "Total clicks", y = NULL, title = "Where do readers go next?") +
+  theme_minimal()
+```
 
+As a treat, I saw on social media that you can make your R charts glow with a package called ggfx. This is the same as the last chart but glowing. (If ggfx is not installed, the glow is skipped and the chart is drawn without it.)
+```{r}
+# is ggfx installed? if not, glow() just returns the plain layer so the notebook still renders
+has_ggfx <- requireNamespace("ggfx", quietly = TRUE)
+glow <- function(layer, ...) {
+  if (has_ggfx) ggfx::with_outer_glow(layer, ...) else layer
+}
+
+ggplot(top10, aes(x = total, y = curr)) +
+  glow(
+    geom_col(fill = "#FF3FA4"),
+    colour = "#FF3FA4", sigma = 4, expand = 1
+  ) +
+  facet_wrap(~prev, scales = "free_y") +
+  scale_x_continuous(labels = scales::comma, n.breaks = 4) +
+  labs(x = "Total clicks", y = NULL, title = "Where do readers go next?") +
+  theme_minimal() +
+  theme(
+    plot.background  = element_rect(fill = "#0D0D1A", colour = NA),
+    panel.background = element_rect(fill = "#0D0D1A", colour = NA),
+    panel.grid       = element_line(colour = "#2A2A44"),
+    text             = element_text(colour = "white"),
+    axis.text        = element_text(colour = "white"),
+    strip.text       = element_text(colour = "white", face = "bold")
+  )
+```
+
+Now, as a final chart for this milestone, I want to explore if wave months have more clicks than non wave months. Of course, we will make this one glow too.
+
+```{r}
+wave_months <- monthly_window |> filter(wave) |> pull(month)
+
+plot_data <- month_totals |>
+  mutate(is_wave = month %in% wave_months)
+
+ggplot(plot_data, aes(x = month, y = total, fill = is_wave)) +
+  geom_col(data = filter(plot_data, !is_wave), width = 20) +
+  glow(
+    geom_col(data = filter(plot_data, is_wave), width = 20),
+    colour = "#FF3FA4", sigma = 4, expand = 1
+  ) +
+  scale_fill_manual(values = c("#5C5C7A", "#FF3FA4"), name = "Wave month?") +
+  labs(x = NULL, y = "Total clicks", title = "Clicks leaving the source page, by month") +
+  theme_minimal() +
+  theme(
+    plot.background  = element_rect(fill = "#0D0D1A", colour = NA),
+    panel.background = element_rect(fill = "#0D0D1A", colour = NA),
+    panel.grid       = element_line(colour = "#2A2A44"),
+    text             = element_text(colour = "white"),
+    axis.text        = element_text(colour = "white"),
+    legend.text      = element_text(colour = "white")
+  )
+
+```
+
+The pink wave bars are not reliably taller than the grey ones next to them, meaning that at this level, we can not claim that waves boost Wikipedia clicks. Interestingly, clicks drop a lot across the x axis, leading me to believe that long-term changes in Wikipedia traffic are swamping any wave effect, so a before/after pair comparison is a fairer test. We will get to this by the next milestone!
+
+```{r}
+# check the claim in my note below: which month had the most clicks, and was it a wave month?
+top_month <- month_totals |> arrange(desc(total)) |> slice(1)
+top_month_is_wave <- top_month$month %in% wave_months
+top_month
+```
+
+## Note: What surprised me in the data
+
+The first thing that surprised me was at the data infrastructure level, where the CCC data had different column names for the same measurements across its three phases. It made me remember that even at the Harvard level, there are some basic data management principles that you may not think about at the collection level that people using your data will certainly come face to face with. This was a good reminder to use best practices even in class assignments!
+
+At the data level, I was surprised about:
+
+- **The article I was studying changed its name.** Climate_change sends about 13,000 readers to Global_warming in September 2019, which looked backwards until I found out the page was moved on August 21, 2020. So the source page switches partway through my study window, and click totals from before and after that date come from two different articles.
+- **Wave months do not reliably boost click levels.** The month with the highest click level was not a  wave month.
+- **My biggest protest month (March 2026) had one of the lowest click counts.** I believe this is because the protest counts come from the large multi-tagged protests and not explicitly climate related protests. This made me rethink including the amount of multitagged protests that I decided on keeping.
+- **Clicks fall a lot over the years.** Monthly clicks drop from roughly 40-55 thousand in 2019-2020 to about 10-20 thousand by 2026, whether or not it is a wave month. That decline is bigger than any wave effect I can see.
+- **The cleaned data is tiny.** I braced for "one million mb", but after filtering to one source page, each month is only a few hundred to a few thousand rows. The slow part was parsing the huge raw files, not storing the results.

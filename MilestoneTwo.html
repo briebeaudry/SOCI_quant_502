@@ -104,7 +104,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<p>For Milestone #2, I want to communicate where the culmination of my weekly output has gotten me. At this point, I have identified my protest waves, and began to download/clean my wikipedia data. Lets take a look:</p>
+<p>For Milestone #2, I want to communicate where the culmination of my weekly output has gotten me. At this point, I have identified my protest waves, downloaded and cleaned my wikipedia data, and began to do some exploratory data analysis on the relationships between the protest waves and the wikipedia clickstream. Before we start, I wanted to flag that my last graphs use the package ggfx(see my read me). If ggfx is not installed, the notebook still renders and those graphs are drawn normally. You will see why I wanted it! :)</p>
 <section id="reading-in-protest-data" class="level2">
 <h2 class="anchored" data-anchor-id="reading-in-protest-data">Reading in Protest Data</h2>
 <p>The CCC data comes in three time periods, so the first step was to combine them all.</p>
@@ -122,18 +122,33 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 ℹ Use the conflicted package (&lt;http://conflicted.r-lib.org/&gt;) to force all conflicts to become errors</code></pre>
 </div>
 </div>
+<p>This is the cleaning code for the CCC protest data. It reads all three files, stacks them, and builds one <code>topic</code> column.</p>
 <div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># find the three CCC files</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>ccc_files <span class="ot">&lt;-</span> <span class="fu">list.files</span>(<span class="st">"data/raw/ccc"</span>, <span class="at">pattern =</span> <span class="st">"</span><span class="sc">\\</span><span class="st">.csv(</span><span class="sc">\\</span><span class="st">.gz)?$"</span>, <span class="at">full.names =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>ccc_files</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] "data/raw/ccc/ccc_compiled_20172020.csv"   
 [2] "data/raw/ccc/ccc_compiled_20212024.csv.gz"
 [3] "data/raw/ccc/ccc-phase3-public.csv"       </code></pre>
 </div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># read every file as text, lower-case the column names, and stack them</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>ccc_raw <span class="ot">&lt;-</span> ccc_files <span class="sc">|&gt;</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map</span>(\(f) <span class="fu">read_csv</span>(f, <span class="at">col_types =</span> <span class="fu">cols</span>(<span class="at">.default =</span> <span class="fu">col_character</span>())) <span class="sc">|&gt;</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>        <span class="fu">rename_with</span>(tolower)) <span class="sc">|&gt;</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">bind_rows</span>()</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="fu">nrow</span>(ccc_raw)   <span class="co"># number of protest events</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] 275151</code></pre>
 </div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ncol</span>(ccc_raw)   <span class="co"># number of columns</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] 114</code></pre>
 </div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>ccc_raw <span class="sc">|&gt;</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(date, locality, state, issues, issue_tags) <span class="sc">|&gt;</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">head</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 6 × 5
   date       locality       state issues                              issue_tags
@@ -145,15 +160,31 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 5 2017-01-01 Oak Ridge      TN    military                            &lt;NA&gt;      
 6 2017-01-02 Washington     DC    military                            &lt;NA&gt;      </code></pre>
 </div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># At this point, I realized that the different time periods of data collection named a column measuring the same thing different names. At time of writing this I am still annoyed about that :)</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>ccc_raw <span class="sc">|&gt;</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">issues       =</span> <span class="fu">sum</span>(<span class="sc">!</span><span class="fu">is.na</span>(issues)),</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">issue_tags   =</span> <span class="fu">sum</span>(<span class="sc">!</span><span class="fu">is.na</span>(issue_tags)),</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">tags_summary =</span> <span class="fu">sum</span>(<span class="sc">!</span><span class="fu">is.na</span>(issue_tags_summary)),</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">total_rows   =</span> <span class="fu">n</span>()</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 1 × 4
   issues issue_tags tags_summary total_rows
    &lt;int&gt;      &lt;int&gt;        &lt;int&gt;      &lt;int&gt;
 1 131060     137452       198532     275151</code></pre>
 </div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># combine the three differently named columns into one "topic" column</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="co"># (coalesce takes the first non-missing value of the three)</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>ccc_raw <span class="ot">&lt;-</span> </span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  ccc_raw <span class="sc">|&gt;</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">topic =</span> <span class="fu">coalesce</span>(issue_tags, issues, issue_tags_summary))</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="fu">sum</span>(<span class="fu">is.na</span>(ccc_raw<span class="sc">$</span>topic))   <span class="co"># events with no topic at all</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] 6639</code></pre>
 </div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>ccc_raw <span class="sc">|&gt;</span> <span class="fu">count</span>(topic, <span class="at">sort =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span> <span class="fu">head</span>(<span class="dv">20</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 20 × 2
    topic                                                                       n
@@ -179,12 +210,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 19 corruption;democracy;economy;education;environment;guns;healthcare;imm…  2507
 20 lgbtqia                                                                  2466</code></pre>
 </div>
-<div class="cell-output cell-output-stdout">
-<pre><code>[1] 6639</code></pre>
-</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># keep only events tagged with environment or climate</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="co"># events with no topic at all are dropped implicitly here: str_detect() on NA</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="co"># returns NA, and filter() discards NA rows</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>climate <span class="ot">&lt;-</span> ccc_raw <span class="sc">|&gt;</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">str_detect</span>(<span class="fu">str_to_lower</span>(topic), <span class="st">"environment|climate"</span>))</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a><span class="fu">nrow</span>(climate)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] 23773</code></pre>
 </div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>climate <span class="sc">|&gt;</span> <span class="fu">count</span>(topic, <span class="at">sort =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span> <span class="fu">head</span>(<span class="dv">15</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 15 × 2
    topic                                                                       n
@@ -208,6 +244,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 <p>At this point, I realized there were some events that were untagged. We will now do a test to interrogate the distribution of untagged events.</p>
 <div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co"># how many untagged events are there in each year?</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>ccc_raw <span class="sc">|&gt;</span></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">is.na</span>(topic)) <span class="sc">|&gt;</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">year =</span> <span class="fu">str_sub</span>(date, <span class="dv">1</span>, <span class="dv">4</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(year)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 10 × 2
    year      n
@@ -223,31 +264,41 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  9 2025    442
 10 2026    239</code></pre>
 </div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>untagged_share <span class="ot">&lt;-</span> <span class="fu">mean</span>(<span class="fu">is.na</span>(ccc_raw<span class="sc">$</span>topic))</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>untagged_share</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] 0.02412857</code></pre>
 </div>
 </div>
-<p>The untagged events (2.4%) are evenly distributed across all years, so I make the choice to drop them.</p>
+<p>The untagged events (2.4%) show up in every year, although more of them are in 2017 and 2018 than in later years. Because they are such a small share of the data, I make the choice to drop them.</p>
 <p>We now count how many climate/environmental protests happened in each month. As a reminder, we are looking at all of the data to find months in the top 10% of monthly protest counts. We will use these to build protest waves.</p>
 <div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="co"># the dates come in two formats, so try year-month-day first, then month-day-year</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="co"># then round each date down to the first day of its month</span></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>climate <span class="ot">&lt;-</span> </span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>  climate <span class="sc">|&gt;</span></span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">date  =</span> <span class="fu">as_date</span>(<span class="fu">parse_date_time</span>(date, <span class="at">orders =</span> <span class="fu">c</span>(<span class="st">"ymd"</span>, <span class="st">"mdy"</span>))),</span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">month =</span> <span class="fu">floor_date</span>(date, <span class="st">"month"</span>)</span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a><span class="fu">nrow</span>(climate)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] 23773</code></pre>
 </div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="fu">range</span>(climate<span class="sc">$</span>date, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] "2017-01-01" "2026-05-31"</code></pre>
 </div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sum</span>(<span class="fu">is.na</span>(climate<span class="sc">$</span>date))   <span class="co"># dates that failed to parse</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] 0</code></pre>
 </div>
-<div class="cell-output cell-output-stdout">
-<pre><code>[1] 23773</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>[1] "2017-01-01" "2026-05-31"</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>[1] 0</code></pre>
-</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="co"># number of climate protests per month</span></span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>monthly <span class="ot">&lt;-</span></span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>  climate <span class="sc">|&gt;</span></span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(month, <span class="at">name =</span> <span class="st">"protests"</span>)</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>monthly <span class="sc">|&gt;</span> <span class="fu">arrange</span>(month)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 113 × 2
    month      protests
@@ -264,18 +315,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 10 2017-10-01       27
 # ℹ 103 more rows</code></pre>
 </div>
-<div class="cell-output cell-output-stdout">
-<pre><code>[1] 10</code></pre>
-</div>
 </div>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="co">#TEST 1: CCC data loaded and parsed</span></span>
-<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="fu">stopifnot</span>(</span>
-<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">"expected 3 CCC files"</span>            <span class="ot">=</span> <span class="fu">length</span>(ccc_files) <span class="sc">==</span> <span class="dv">3</span>,</span>
-<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">"key columns are missing"</span>         <span class="ot">=</span> <span class="fu">all</span>(<span class="fu">c</span>(<span class="st">"date"</span>, <span class="st">"locality"</span>, <span class="st">"state"</span>, <span class="st">"issues"</span>) <span class="sc">%in%</span> <span class="fu">names</span>(ccc_raw)),</span>
-<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"5% or more events are untagged"</span>  <span class="ot">=</span> untagged_share <span class="sc">&lt;</span> <span class="fl">0.05</span>,</span>
-<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">"1% or more dates failed to parse"</span> <span class="ot">=</span> <span class="fu">mean</span>(<span class="fu">is.na</span>(climate<span class="sc">$</span>date)) <span class="sc">&lt;</span> <span class="fl">0.01</span></span>
-<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="co">#TEST 1: CCC data loaded and parsed</span></span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a><span class="fu">stopifnot</span>(</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">"expected 3 CCC files"</span>            <span class="ot">=</span> <span class="fu">length</span>(ccc_files) <span class="sc">==</span> <span class="dv">3</span>,</span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">"key columns are missing"</span>         <span class="ot">=</span> <span class="fu">all</span>(<span class="fu">c</span>(<span class="st">"date"</span>, <span class="st">"locality"</span>, <span class="st">"state"</span>, <span class="st">"issues"</span>) <span class="sc">%in%</span> <span class="fu">names</span>(ccc_raw)),</span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"5% or more events are untagged"</span>  <span class="ot">=</span> untagged_share <span class="sc">&lt;</span> <span class="fl">0.05</span>,</span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">"1% or more dates failed to parse"</span> <span class="ot">=</span> <span class="fu">mean</span>(<span class="fu">is.na</span>(climate<span class="sc">$</span>date)) <span class="sc">&lt;</span> <span class="fl">0.01</span></span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Yay! Now we can visualize our data. Previously, I tried histograms and bar graphs, but found this data best visualized in a heat map. Lets take a look at that process.</p>
 <p>First, I did a heat map with no modifications.</p>
@@ -290,10 +338,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 <p>This heat map does not have enough contrast to be readable. This is due to the strong outlier months. I decided to set a cap on the colour range at the 90th percentile.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>climate <span class="sc">|&gt;</span></span>
-<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(month, <span class="at">name =</span> <span class="st">"protests"</span>) <span class="sc">|&gt;</span></span>
-<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(protests) <span class="sc">|&gt;</span></span>
-<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">quantile</span>(<span class="fu">c</span>(.<span class="dv">1</span>, .<span class="dv">25</span>, .<span class="dv">5</span>, .<span class="dv">75</span>, .<span class="dv">9</span>, .<span class="dv">95</span>, <span class="dv">1</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>climate <span class="sc">|&gt;</span></span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(month, <span class="at">name =</span> <span class="st">"protests"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(protests) <span class="sc">|&gt;</span></span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">quantile</span>(<span class="fu">c</span>(.<span class="dv">1</span>, .<span class="dv">25</span>, .<span class="dv">5</span>, .<span class="dv">75</span>, .<span class="dv">9</span>, .<span class="dv">95</span>, <span class="dv">1</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>   10%    25%    50%    75%    90%    95%   100% 
   27.0   41.0  122.0  213.0  331.4  431.8 3636.0 </code></pre>
@@ -301,28 +349,28 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 <p>Half of our months have 122 protest or fewer, 90% are under 331, but the upper percentile has 3636!! Lets try setting the cap at the 90th percentile. This means the top 10% will get the darkest pink, and everything else should be more visible on the heat map.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>cap <span class="ot">&lt;-</span> <span class="dv">350</span></span>
-<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>climate <span class="sc">|&gt;</span></span>
-<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(month, <span class="at">name =</span> <span class="st">"protests"</span>) <span class="sc">|&gt;</span></span>
-<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">year =</span> <span class="fu">factor</span>(<span class="fu">year</span>(month)),</span>
-<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">mon  =</span> <span class="fu">month</span>(month, <span class="at">label =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
-<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> mon, <span class="at">y =</span> <span class="fu">fct_rev</span>(year), <span class="at">fill =</span> protests)) <span class="sc">+</span></span>
-<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_tile</span>(<span class="at">color =</span> <span class="st">"white"</span>) <span class="sc">+</span></span>
-<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text</span>(<span class="fu">aes</span>(<span class="at">label =</span> protests), <span class="at">size =</span> <span class="dv">3</span>) <span class="sc">+</span></span>
-<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_gradientn</span>(</span>
-<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">colors =</span> <span class="fu">c</span>(<span class="st">"#FFF5F9"</span>, <span class="st">"#FAC4DA"</span>, <span class="st">"#F27BAE"</span>, <span class="st">"#E0218A"</span>, <span class="st">"#C2185B"</span>),</span>
-<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">limits =</span> <span class="fu">c</span>(<span class="dv">0</span>, cap),</span>
-<span id="cb25-15"><a href="#cb25-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">oob =</span> scales<span class="sc">::</span>squish,</span>
-<span id="cb25-16"><a href="#cb25-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">breaks =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">100</span>, <span class="dv">200</span>, <span class="dv">300</span>, <span class="dv">350</span>),</span>
-<span id="cb25-17"><a href="#cb25-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">labels =</span> <span class="fu">c</span>(<span class="st">"0"</span>, <span class="st">"100"</span>, <span class="st">"200"</span>, <span class="st">"300"</span>, <span class="st">"350+"</span>),</span>
-<span id="cb25-18"><a href="#cb25-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">name =</span> <span class="st">"Protests"</span></span>
-<span id="cb25-19"><a href="#cb25-19" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb25-20"><a href="#cb25-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="cn">NULL</span>, <span class="at">title =</span> <span class="st">"Climate protests per month"</span>) <span class="sc">+</span></span>
-<span id="cb25-21"><a href="#cb25-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
-<span id="cb25-22"><a href="#cb25-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">panel.grid =</span> <span class="fu">element_blank</span>())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>cap <span class="ot">&lt;-</span> <span class="dv">350</span></span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>climate <span class="sc">|&gt;</span></span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(month, <span class="at">name =</span> <span class="st">"protests"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">year =</span> <span class="fu">factor</span>(<span class="fu">year</span>(month)),</span>
+<span id="cb35-7"><a href="#cb35-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">mon  =</span> <span class="fu">month</span>(month, <span class="at">label =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb35-8"><a href="#cb35-8" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb35-9"><a href="#cb35-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> mon, <span class="at">y =</span> <span class="fu">fct_rev</span>(year), <span class="at">fill =</span> protests)) <span class="sc">+</span></span>
+<span id="cb35-10"><a href="#cb35-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_tile</span>(<span class="at">color =</span> <span class="st">"white"</span>) <span class="sc">+</span></span>
+<span id="cb35-11"><a href="#cb35-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text</span>(<span class="fu">aes</span>(<span class="at">label =</span> protests), <span class="at">size =</span> <span class="dv">3</span>) <span class="sc">+</span></span>
+<span id="cb35-12"><a href="#cb35-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_gradientn</span>(</span>
+<span id="cb35-13"><a href="#cb35-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">colors =</span> <span class="fu">c</span>(<span class="st">"#FFF5F9"</span>, <span class="st">"#FAC4DA"</span>, <span class="st">"#F27BAE"</span>, <span class="st">"#E0218A"</span>, <span class="st">"#C2185B"</span>),</span>
+<span id="cb35-14"><a href="#cb35-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">limits =</span> <span class="fu">c</span>(<span class="dv">0</span>, cap),</span>
+<span id="cb35-15"><a href="#cb35-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">oob =</span> scales<span class="sc">::</span>squish,</span>
+<span id="cb35-16"><a href="#cb35-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">breaks =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">100</span>, <span class="dv">200</span>, <span class="dv">300</span>, <span class="dv">350</span>),</span>
+<span id="cb35-17"><a href="#cb35-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">labels =</span> <span class="fu">c</span>(<span class="st">"0"</span>, <span class="st">"100"</span>, <span class="st">"200"</span>, <span class="st">"300"</span>, <span class="st">"350+"</span>),</span>
+<span id="cb35-18"><a href="#cb35-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">name =</span> <span class="st">"Protests"</span></span>
+<span id="cb35-19"><a href="#cb35-19" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb35-20"><a href="#cb35-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="cn">NULL</span>, <span class="at">title =</span> <span class="st">"Climate protests per month"</span>) <span class="sc">+</span></span>
+<span id="cb35-21"><a href="#cb35-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb35-22"><a href="#cb35-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">panel.grid =</span> <span class="fu">element_blank</span>())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -333,14 +381,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 <p>This whole situation made me realize I need to make a choice about my outliers. The outlier months are typically months with a large amount of multi-tagged protest - for example,</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>climate <span class="sc">|&gt;</span></span>
-<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(date, issues) <span class="sc">|&gt;</span></span>
-<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(</span>
-<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">year</span>(date) <span class="sc">==</span> <span class="dv">2026</span>,</span>
-<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">month</span>(date) <span class="sc">==</span> <span class="dv">3</span>,</span>
-<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">str_count</span>(issues, <span class="st">"</span><span class="sc">\\</span><span class="st">w+"</span>) <span class="sc">&gt;</span> <span class="dv">10</span></span>
-<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
-<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">head</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>climate <span class="sc">|&gt;</span></span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(date, issues) <span class="sc">|&gt;</span></span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(</span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">year</span>(date) <span class="sc">==</span> <span class="dv">2026</span>,</span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">month</span>(date) <span class="sc">==</span> <span class="dv">3</span>,</span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">str_count</span>(issues, <span class="st">"</span><span class="sc">\\</span><span class="st">w+"</span>) <span class="sc">&gt;</span> <span class="dv">10</span></span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">head</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 6 × 2
   date       issues                                                             
@@ -360,31 +408,32 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="next-step-identify-protest-waves">Next step: Identify protest waves</h2>
 <p>The Clickstream data starts in late 2017, so my study window begins in December 2017. The last month of CCC data (May 2026) is only partly covered, so the window ends at the last full month. Every month in the window has at least one protest, so no months needed to be filled in as zero. A protest wave is a month in the top 10% of monthly counts.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="co">#clickstream data needs two months to form a pair so we start in december 2017  </span></span>
-<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>study_start <span class="ot">&lt;-</span> <span class="fu">ymd</span>(<span class="st">"2017-12-01"</span>)</span>
-<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a><span class="co"># the ccc dataset is incomplete fro may 2026 so we are going to go back one month from the last recorded month (may 2026) to ensure we only use months </span></span>
-<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>study_end   <span class="ot">&lt;-</span> <span class="fu">floor_date</span>(<span class="fu">max</span>(climate<span class="sc">$</span>date, <span class="at">na.rm =</span> <span class="cn">TRUE</span>), <span class="st">"month"</span>) <span class="sc">%m-%</span> <span class="fu">months</span>(<span class="dv">1</span>)</span>
-<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>study_end</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="co">#clickstream data needs two months to form a pair so we start in december 2017  </span></span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>study_start <span class="ot">&lt;-</span> <span class="fu">ymd</span>(<span class="st">"2017-12-01"</span>)</span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a><span class="co"># the ccc dataset is incomplete for may 2026 so we are going to go back one month from the last recorded month (may 2026) to ensure we only use full months </span></span>
+<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a>study_end   <span class="ot">&lt;-</span> <span class="fu">floor_date</span>(<span class="fu">max</span>(climate<span class="sc">$</span>date, <span class="at">na.rm =</span> <span class="cn">TRUE</span>), <span class="st">"month"</span>) <span class="sc">%m-%</span> <span class="fu">months</span>(<span class="dv">1</span>)</span>
+<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a>study_end</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] "2026-04-01"</code></pre>
 </div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>monthly_window <span class="ot">&lt;-</span> monthly <span class="sc">|&gt;</span></span>
-<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(month <span class="sc">&gt;=</span> study_start, month <span class="sc">&lt;=</span> study_end)</span>
-<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a><span class="fu">nrow</span>(monthly_window)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>monthly_window <span class="ot">&lt;-</span> monthly <span class="sc">|&gt;</span></span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(month <span class="sc">&gt;=</span> study_start, month <span class="sc">&lt;=</span> study_end)</span>
+<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb40-4"><a href="#cb40-4" aria-hidden="true" tabindex="-1"></a><span class="fu">nrow</span>(monthly_window)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] 101</code></pre>
 </div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>wave_cutoff <span class="ot">&lt;-</span> <span class="fu">quantile</span>(monthly_window<span class="sc">$</span>protests, <span class="fl">0.90</span>)</span>
-<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>wave_cutoff</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>wave_cutoff <span class="ot">&lt;-</span> <span class="fu">quantile</span>(monthly_window<span class="sc">$</span>protests, <span class="fl">0.90</span>)</span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>wave_cutoff</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>90% 
 335 </code></pre>
 </div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>monthly_window <span class="ot">&lt;-</span> monthly_window <span class="sc">|&gt;</span></span>
-<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">wave =</span> protests <span class="sc">&gt;=</span> wave_cutoff)</span>
-<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a>monthly_window <span class="sc">|&gt;</span> <span class="fu">count</span>(wave)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb44"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a><span class="co"># a wave month is any month at or above the 90th percentile</span></span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a>monthly_window <span class="ot">&lt;-</span> monthly_window <span class="sc">|&gt;</span></span>
+<span id="cb44-3"><a href="#cb44-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">wave =</span> protests <span class="sc">&gt;=</span> wave_cutoff)</span>
+<span id="cb44-4"><a href="#cb44-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb44-5"><a href="#cb44-5" aria-hidden="true" tabindex="-1"></a>monthly_window <span class="sc">|&gt;</span> <span class="fu">count</span>(wave)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 2 × 2
   wave      n
@@ -392,7 +441,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 1 FALSE    90
 2 TRUE     11</code></pre>
 </div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>monthly_window <span class="sc">|&gt;</span> <span class="fu">filter</span>(wave) <span class="sc">|&gt;</span> <span class="fu">select</span>(month, protests)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb46"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a><span class="co"># full list of wave months (print(n = Inf) shows every row)</span></span>
+<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a>monthly_window <span class="sc">|&gt;</span> <span class="fu">filter</span>(wave) <span class="sc">|&gt;</span> <span class="fu">select</span>(month, protests) <span class="sc">|&gt;</span> <span class="fu">print</span>(<span class="at">n =</span> <span class="cn">Inf</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 11 × 2
    month      protests
@@ -409,50 +459,24 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 10 2026-01-01      909
 11 2026-03-01     3636</code></pre>
 </div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="co"># full list of wave months (print(n = Inf) shows every row)</span></span>
-<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>monthly_window <span class="sc">|&gt;</span> <span class="fu">count</span>(wave)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code># A tibble: 2 × 2
-  wave      n
-  &lt;lgl&gt; &lt;int&gt;
-1 FALSE    90
-2 TRUE     11</code></pre>
-</div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>monthly_window <span class="sc">|&gt;</span> <span class="fu">filter</span>(wave) <span class="sc">|&gt;</span> <span class="fu">select</span>(month, protests) <span class="sc">|&gt;</span> <span class="fu">print</span>(<span class="at">n =</span> <span class="cn">Inf</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code># A tibble: 11 × 2
-   month      protests
-   &lt;date&gt;        &lt;int&gt;
- 1 2019-01-01      365
- 2 2019-09-01     1447
- 3 2019-12-01      526
- 4 2022-03-01      364
- 5 2022-04-01      421
- 6 2023-03-01      354
- 7 2024-03-01      335
- 8 2025-01-01      448
- 9 2025-10-01     2640
-10 2026-01-01      909
-11 2026-03-01     3636</code></pre>
-</div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="co"># build the before/after pairs</span></span>
-<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>month_pairs <span class="ot">&lt;-</span> monthly_window <span class="sc">|&gt;</span></span>
-<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">before_month    =</span> <span class="fu">lag</span>(month),</span>
-<span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">before_protests =</span> <span class="fu">lag</span>(protests),</span>
-<span id="cb42-6"><a href="#cb42-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">before_is_wave  =</span> <span class="fu">lag</span>(wave)</span>
-<span id="cb42-7"><a href="#cb42-7" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
-<span id="cb42-8"><a href="#cb42-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(before_month)) <span class="sc">|&gt;</span>   <span class="co"># drops Dec 2017, which only serves as a "before"</span></span>
-<span id="cb42-9"><a href="#cb42-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">transmute</span>(</span>
-<span id="cb42-10"><a href="#cb42-10" aria-hidden="true" tabindex="-1"></a>    before_month,</span>
-<span id="cb42-11"><a href="#cb42-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">after_month    =</span> month,</span>
-<span id="cb42-12"><a href="#cb42-12" aria-hidden="true" tabindex="-1"></a>    before_protests,</span>
-<span id="cb42-13"><a href="#cb42-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">after_protests =</span> protests,</span>
-<span id="cb42-14"><a href="#cb42-14" aria-hidden="true" tabindex="-1"></a>    before_is_wave,</span>
-<span id="cb42-15"><a href="#cb42-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">pair_type =</span> <span class="fu">if_else</span>(wave, <span class="st">"wave"</span>, <span class="st">"ordinary"</span>)</span>
-<span id="cb42-16"><a href="#cb42-16" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb42-17"><a href="#cb42-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb42-18"><a href="#cb42-18" aria-hidden="true" tabindex="-1"></a><span class="fu">count</span>(month_pairs, pair_type)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb48"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a><span class="co"># build the before/after pairs</span></span>
+<span id="cb48-2"><a href="#cb48-2" aria-hidden="true" tabindex="-1"></a>month_pairs <span class="ot">&lt;-</span> monthly_window <span class="sc">|&gt;</span></span>
+<span id="cb48-3"><a href="#cb48-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb48-4"><a href="#cb48-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">before_month    =</span> <span class="fu">lag</span>(month),</span>
+<span id="cb48-5"><a href="#cb48-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">before_protests =</span> <span class="fu">lag</span>(protests),</span>
+<span id="cb48-6"><a href="#cb48-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">before_is_wave  =</span> <span class="fu">lag</span>(wave)</span>
+<span id="cb48-7"><a href="#cb48-7" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb48-8"><a href="#cb48-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(before_month)) <span class="sc">|&gt;</span>   <span class="co"># drops Dec 2017, which only serves as a "before"</span></span>
+<span id="cb48-9"><a href="#cb48-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">transmute</span>(</span>
+<span id="cb48-10"><a href="#cb48-10" aria-hidden="true" tabindex="-1"></a>    before_month,</span>
+<span id="cb48-11"><a href="#cb48-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">after_month    =</span> month,</span>
+<span id="cb48-12"><a href="#cb48-12" aria-hidden="true" tabindex="-1"></a>    before_protests,</span>
+<span id="cb48-13"><a href="#cb48-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">after_protests =</span> protests,</span>
+<span id="cb48-14"><a href="#cb48-14" aria-hidden="true" tabindex="-1"></a>    before_is_wave,</span>
+<span id="cb48-15"><a href="#cb48-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">pair_type =</span> <span class="fu">if_else</span>(wave, <span class="st">"wave"</span>, <span class="st">"ordinary"</span>)</span>
+<span id="cb48-16"><a href="#cb48-16" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb48-17"><a href="#cb48-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb48-18"><a href="#cb48-18" aria-hidden="true" tabindex="-1"></a><span class="fu">count</span>(month_pairs, pair_type)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 2 × 2
   pair_type     n
@@ -460,7 +484,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 1 ordinary     89
 2 wave         11</code></pre>
 </div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb44"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a>month_pairs <span class="sc">|&gt;</span> <span class="fu">filter</span>(pair_type <span class="sc">==</span> <span class="st">"wave"</span>) <span class="sc">|&gt;</span> <span class="fu">count</span>(before_is_wave)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb50"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a>month_pairs <span class="sc">|&gt;</span> <span class="fu">filter</span>(pair_type <span class="sc">==</span> <span class="st">"wave"</span>) <span class="sc">|&gt;</span> <span class="fu">count</span>(before_is_wave)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 2 × 2
   before_is_wave     n
@@ -470,16 +494,47 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </div>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb46"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a><span class="co">#  </span><span class="al">TEST</span><span class="co"> 2: study window is complete and gap-free</span></span>
-<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a>expected_months <span class="ot">&lt;-</span> <span class="fu">seq</span>(study_start, study_end, <span class="at">by =</span> <span class="st">"month"</span>)</span>
-<span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a><span class="fu">stopifnot</span>(</span>
-<span id="cb46-4"><a href="#cb46-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">"window does not end Apr 2026"</span>  <span class="ot">=</span> study_end <span class="sc">==</span> <span class="fu">ymd</span>(<span class="st">"2026-04-01"</span>),</span>
-<span id="cb46-5"><a href="#cb46-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"window has the wrong number of months"</span> <span class="ot">=</span> <span class="fu">nrow</span>(monthly_window) <span class="sc">==</span> <span class="fu">length</span>(expected_months),</span>
-<span id="cb46-6"><a href="#cb46-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">"window has a missing month"</span>    <span class="ot">=</span> <span class="fu">all</span>(monthly_window<span class="sc">$</span>month <span class="sc">==</span> expected_months),</span>
-<span id="cb46-7"><a href="#cb46-7" aria-hidden="true" tabindex="-1"></a>  <span class="st">"window has a zero-protest month"</span> <span class="ot">=</span> <span class="fu">all</span>(monthly_window<span class="sc">$</span>protests <span class="sc">&gt;=</span> <span class="dv">1</span>)</span>
-<span id="cb46-8"><a href="#cb46-8" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb52"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb52-1"><a href="#cb52-1" aria-hidden="true" tabindex="-1"></a><span class="co">#  </span><span class="al">TEST</span><span class="co"> 2: study window is complete and gap-free</span></span>
+<span id="cb52-2"><a href="#cb52-2" aria-hidden="true" tabindex="-1"></a>expected_months <span class="ot">&lt;-</span> <span class="fu">seq</span>(study_start, study_end, <span class="at">by =</span> <span class="st">"month"</span>)</span>
+<span id="cb52-3"><a href="#cb52-3" aria-hidden="true" tabindex="-1"></a><span class="fu">stopifnot</span>(</span>
+<span id="cb52-4"><a href="#cb52-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">"window does not end Apr 2026"</span>  <span class="ot">=</span> study_end <span class="sc">==</span> <span class="fu">ymd</span>(<span class="st">"2026-04-01"</span>),</span>
+<span id="cb52-5"><a href="#cb52-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"window has the wrong number of months"</span> <span class="ot">=</span> <span class="fu">nrow</span>(monthly_window) <span class="sc">==</span> <span class="fu">length</span>(expected_months),</span>
+<span id="cb52-6"><a href="#cb52-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">"window has a missing month"</span>    <span class="ot">=</span> <span class="fu">all</span>(monthly_window<span class="sc">$</span>month <span class="sc">==</span> expected_months),</span>
+<span id="cb52-7"><a href="#cb52-7" aria-hidden="true" tabindex="-1"></a>  <span class="st">"window has a zero-protest month"</span> <span class="ot">=</span> <span class="fu">all</span>(monthly_window<span class="sc">$</span>protests <span class="sc">&gt;=</span> <span class="dv">1</span>)</span>
+<span id="cb52-8"><a href="#cb52-8" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>We have now identified the “wave” months. Some notes: - 11 total wave months, with a cutoff of 335 protests per month - There is only one back to back wave (March and April 2022), meaning we have 10 “ordinary” pairs - 4 of the 11 waves are in March, which signals to me that I investigate this pattern (seasonal/spring mobilizations?) - 3 of the 11 months are in January, same question as above - I also want to check if the CCC’s tagging changed over time, as the most extreme waves are also quite recent. This could be because of the political events we spoke about earlier, but I want to make sure it is not an obvious data effect.</p>
+<p>Here is a first exploratory graph of the protest data: climate protests per month, with the wave months highlighted.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb53"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a>monthly_window <span class="sc">|&gt;</span></span>
+<span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(month, protests, <span class="at">fill =</span> wave)) <span class="sc">+</span></span>
+<span id="cb53-3"><a href="#cb53-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_col</span>() <span class="sc">+</span></span>
+<span id="cb53-4"><a href="#cb53-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(</span>
+<span id="cb53-5"><a href="#cb53-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">values =</span> <span class="fu">c</span>(<span class="st">"grey70"</span>, <span class="st">"#E0218A"</span>),</span>
+<span id="cb53-6"><a href="#cb53-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">labels =</span> <span class="fu">c</span>(<span class="st">"Ordinary month"</span>, <span class="st">"Wave month"</span>),</span>
+<span id="cb53-7"><a href="#cb53-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">name =</span> <span class="cn">NULL</span></span>
+<span id="cb53-8"><a href="#cb53-8" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb53-9"><a href="#cb53-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb53-10"><a href="#cb53-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="st">"Number of protests"</span>,</span>
+<span id="cb53-11"><a href="#cb53-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"Climate protests per month"</span>,</span>
+<span id="cb53-12"><a href="#cb53-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">"Wave months are the top 10% of monthly counts"</span></span>
+<span id="cb53-13"><a href="#cb53-13" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb53-14"><a href="#cb53-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MilestoneTwo_files/figure-html/exploratory-graph-protests-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>We have now identified the “wave” months. Some notes:</p>
+<ul>
+<li>11 total wave months, with a cutoff of 335 protests per month</li>
+<li>There is only one back to back wave (March and April 2022), meaning we have 10 “ordinary” pairs</li>
+<li>4 of the 11 waves are in March, which signals to me that I investigate this pattern (seasonal/spring mobilizations?)</li>
+<li>3 of the 11 months are in January, same question as above</li>
+<li>I also want to check if the CCC’s tagging changed over time, as the most extreme waves are also quite recent. This could be because of the political events we spoke about earlier, but I want to make sure it is not an obvious data effect.</li>
+</ul>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 2 × 2
@@ -801,92 +856,45 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </div>
 <p>YAY!</p>
-<p>Now we know what wikipedia data we are going to download.</p>
 </section>
 <section id="wikipedia-clickstream-data" class="level2">
 <h2 class="anchored" data-anchor-id="wikipedia-clickstream-data">Wikipedia Clickstream Data</h2>
 <section id="testing" class="level3">
 <h3 class="anchored" data-anchor-id="testing">Testing</h3>
-<p>Before I go ahead and download one million mb of clickstream data, lets download one month and test out our data cleaning.</p>
+<p>Before I go ahead and download one million mb of clickstream data, lets download one month and test out our data cleaning. (This exploratory code is not run when the document renders, since it downloads a large file.)</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb51"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(<span class="st">"data/raw/clickstream"</span>, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb51-2"><a href="#cb51-2" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">timeout =</span> <span class="dv">3600</span>)</span>
-<span id="cb51-3"><a href="#cb51-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb51-4"><a href="#cb51-4" aria-hidden="true" tabindex="-1"></a><span class="fu">download.file</span>(</span>
-<span id="cb51-5"><a href="#cb51-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"https://dumps.wikimedia.org/other/clickstream/2019-09/clickstream-enwiki-2019-09.tsv.gz"</span>,</span>
-<span id="cb51-6"><a href="#cb51-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">destfile =</span> <span class="st">"data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz"</span>,</span>
-<span id="cb51-7"><a href="#cb51-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">mode =</span> <span class="st">"wb"</span></span>
-<span id="cb51-8"><a href="#cb51-8" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb51-9"><a href="#cb51-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb51-10"><a href="#cb51-10" aria-hidden="true" tabindex="-1"></a><span class="fu">file.size</span>(<span class="st">"data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz"</span>) <span class="sc">/</span> <span class="fl">1e6</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>[1] 385.1643</code></pre>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb58"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb58-1"><a href="#cb58-1" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(<span class="st">"data/raw/clickstream"</span>, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb58-2"><a href="#cb58-2" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">timeout =</span> <span class="dv">3600</span>)</span>
+<span id="cb58-3"><a href="#cb58-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb58-4"><a href="#cb58-4" aria-hidden="true" tabindex="-1"></a><span class="fu">download.file</span>(</span>
+<span id="cb58-5"><a href="#cb58-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"https://dumps.wikimedia.org/other/clickstream/2019-09/clickstream-enwiki-2019-09.tsv.gz"</span>,</span>
+<span id="cb58-6"><a href="#cb58-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">destfile =</span> <span class="st">"data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz"</span>,</span>
+<span id="cb58-7"><a href="#cb58-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">mode =</span> <span class="st">"wb"</span></span>
+<span id="cb58-8"><a href="#cb58-8" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb58-9"><a href="#cb58-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb58-10"><a href="#cb58-10" aria-hidden="true" tabindex="-1"></a><span class="fu">file.size</span>(<span class="st">"data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz"</span>) <span class="sc">/</span> <span class="fl">1e6</span></span>
+<span id="cb58-11"><a href="#cb58-11" aria-hidden="true" tabindex="-1"></a><span class="fu">read_tsv</span>(</span>
+<span id="cb58-12"><a href="#cb58-12" aria-hidden="true" tabindex="-1"></a>  <span class="st">"data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz"</span>,</span>
+<span id="cb58-13"><a href="#cb58-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">col_names =</span> <span class="fu">c</span>(<span class="st">"prev"</span>, <span class="st">"curr"</span>, <span class="st">"type"</span>, <span class="st">"n"</span>),</span>
+<span id="cb58-14"><a href="#cb58-14" aria-hidden="true" tabindex="-1"></a>  <span class="at">col_types =</span> <span class="st">"cccd"</span>,</span>
+<span id="cb58-15"><a href="#cb58-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">n_max =</span> <span class="dv">20</span>,</span>
+<span id="cb58-16"><a href="#cb58-16" aria-hidden="true" tabindex="-1"></a>  <span class="at">quote =</span> <span class="st">""</span></span>
+<span id="cb58-17"><a href="#cb58-17" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb58-18"><a href="#cb58-18" aria-hidden="true" tabindex="-1"></a>climate_clicks <span class="ot">&lt;-</span> <span class="fu">read_tsv_chunked</span>(</span>
+<span id="cb58-19"><a href="#cb58-19" aria-hidden="true" tabindex="-1"></a>  <span class="st">"data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz"</span>,</span>
+<span id="cb58-20"><a href="#cb58-20" aria-hidden="true" tabindex="-1"></a>  <span class="at">callback =</span> DataFrameCallback<span class="sc">$</span><span class="fu">new</span>(</span>
+<span id="cb58-21"><a href="#cb58-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">function</span>(x, pos) <span class="fu">filter</span>(x, prev <span class="sc">==</span> <span class="st">"Climate_change"</span>) <span class="co"># filter to show climate change homepage</span></span>
+<span id="cb58-22"><a href="#cb58-22" aria-hidden="true" tabindex="-1"></a>  ),</span>
+<span id="cb58-23"><a href="#cb58-23" aria-hidden="true" tabindex="-1"></a>  <span class="at">chunk_size =</span> <span class="fl">1e6</span>,</span>
+<span id="cb58-24"><a href="#cb58-24" aria-hidden="true" tabindex="-1"></a>  <span class="at">col_names =</span> <span class="fu">c</span>(<span class="st">"prev"</span>, <span class="st">"curr"</span>, <span class="st">"type"</span>, <span class="st">"n"</span>),</span>
+<span id="cb58-25"><a href="#cb58-25" aria-hidden="true" tabindex="-1"></a>  <span class="at">col_types =</span> <span class="st">"cccd"</span>,</span>
+<span id="cb58-26"><a href="#cb58-26" aria-hidden="true" tabindex="-1"></a>  <span class="at">quote =</span> <span class="st">""</span></span>
+<span id="cb58-27"><a href="#cb58-27" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb58-28"><a href="#cb58-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb58-29"><a href="#cb58-29" aria-hidden="true" tabindex="-1"></a><span class="fu">nrow</span>(climate_clicks)</span>
+<span id="cb58-30"><a href="#cb58-30" aria-hidden="true" tabindex="-1"></a>climate_clicks <span class="sc">|&gt;</span> <span class="fu">arrange</span>(<span class="fu">desc</span>(n)) <span class="sc">|&gt;</span> <span class="fu">slice_head</span>(<span class="at">n =</span> <span class="dv">10</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb53"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a><span class="fu">read_tsv</span>(</span>
-<span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">"data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz"</span>,</span>
-<span id="cb53-3"><a href="#cb53-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">col_names =</span> <span class="fu">c</span>(<span class="st">"prev"</span>, <span class="st">"curr"</span>, <span class="st">"type"</span>, <span class="st">"n"</span>),</span>
-<span id="cb53-4"><a href="#cb53-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">col_types =</span> <span class="st">"cccd"</span>,</span>
-<span id="cb53-5"><a href="#cb53-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">n_max =</span> <span class="dv">20</span>,</span>
-<span id="cb53-6"><a href="#cb53-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">quote =</span> <span class="st">""</span></span>
-<span id="cb53-7"><a href="#cb53-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code># A tibble: 20 × 4
-   prev                      curr     type         n
-   &lt;chr&gt;                     &lt;chr&gt;    &lt;chr&gt;    &lt;dbl&gt;
- 1 Dave_Lister               Vindaloo link        33
- 2 other-internal            Vindaloo external   347
- 3 Goa                       Vindaloo link        77
- 4 List_of_goat_dishes       Vindaloo link        20
- 5 Food_history              Vindaloo link        12
- 6 Grounded_Vindaloop        Vindaloo link        72
- 7 Goan_cuisine              Vindaloo link        98
- 8 other-empty               Vindaloo external  2093
- 9 Phall                     Vindaloo link       339
-10 India                     Vindaloo link       134
-11 Indian_cuisine            Vindaloo link        59
-12 Spice_mix                 Vindaloo link        73
-13 Spiedie                   Vindaloo other       10
-14 Butter_chicken            Vindaloo link        10
-15 Vindaloo_(song)           Vindaloo link        42
-16 Vindaloo_(disambiguation) Vindaloo link        11
-17 Main_Page                 Vindaloo other       90
-18 Madras_curry_sauce        Vindaloo other       11
-19 Chicken_tikka_masala      Vindaloo link        23
-20 other-other               Vindaloo external    13</code></pre>
-</div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb55"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a>climate_clicks <span class="ot">&lt;-</span> <span class="fu">read_tsv_chunked</span>(</span>
-<span id="cb55-2"><a href="#cb55-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">"data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz"</span>,</span>
-<span id="cb55-3"><a href="#cb55-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">callback =</span> DataFrameCallback<span class="sc">$</span><span class="fu">new</span>(</span>
-<span id="cb55-4"><a href="#cb55-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">function</span>(x, pos) <span class="fu">filter</span>(x, prev <span class="sc">==</span> <span class="st">"Climate_change"</span>) <span class="co"># filter to show climate change homepage</span></span>
-<span id="cb55-5"><a href="#cb55-5" aria-hidden="true" tabindex="-1"></a>  ),</span>
-<span id="cb55-6"><a href="#cb55-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">chunk_size =</span> <span class="fl">1e6</span>,</span>
-<span id="cb55-7"><a href="#cb55-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">col_names =</span> <span class="fu">c</span>(<span class="st">"prev"</span>, <span class="st">"curr"</span>, <span class="st">"type"</span>, <span class="st">"n"</span>),</span>
-<span id="cb55-8"><a href="#cb55-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">col_types =</span> <span class="st">"cccd"</span>,</span>
-<span id="cb55-9"><a href="#cb55-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">quote =</span> <span class="st">""</span></span>
-<span id="cb55-10"><a href="#cb55-10" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb55-11"><a href="#cb55-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb55-12"><a href="#cb55-12" aria-hidden="true" tabindex="-1"></a><span class="fu">nrow</span>(climate_clicks)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>[1] 329</code></pre>
-</div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb57"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb57-1"><a href="#cb57-1" aria-hidden="true" tabindex="-1"></a>climate_clicks <span class="sc">|&gt;</span> <span class="fu">arrange</span>(<span class="fu">desc</span>(n)) <span class="sc">|&gt;</span> <span class="fu">slice_head</span>(<span class="at">n =</span> <span class="dv">10</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code># A tibble: 10 × 4
-   prev           curr                                 type      n
-   &lt;chr&gt;          &lt;chr&gt;                                &lt;chr&gt; &lt;dbl&gt;
- 1 Climate_change Global_warming                       link  13085
- 2 Climate_change Climate_system                       link   1557
- 3 Climate_change Human_impact_on_the_environment      link   1521
- 4 Climate_change Attribution_of_recent_climate_change link   1046
- 5 Climate_change Earth's_energy_budget                link   1043
- 6 Climate_change Hyphen-minus                         other   719
- 7 Climate_change Paleoclimatology                     link    707
- 8 Climate_change Geologic_temperature_record          link    612
- 9 Climate_change El_Niño–Southern_Oscillation         link    583
-10 Climate_change Index_of_climate_change_articles     link    529</code></pre>
-</div>
-</div>
-<p>Climate_change sends 12085 readers to the Global_warming, and this data is from 2019… what was the phenomenon of broad climatic pattern change due to anthropocentric influence called then? Was it more commonly known as “global warming?”</p>
+<p>Climate_change sends 13,085 readers to the Global_warming, and this data is from 2019… what was the phenomenon of broad climatic pattern change due to anthropocentric influence called then? Was it more commonly known as “global warming?”</p>
 <p>Yes! I have googled this query and a formal “requested move” discussion opened on the article’s discussion page to change the title from Global Warming to Climate Change. The official page move occured on August 21, 2020. Lets try that last chunk again, but filtering for Global_warming as the starting page.</p>
 <p>Therefore, March 2020 wave and earlier will be Global_warming, Nov 2020 wave and after will be Climate_change.</p>
 <div class="cell">
@@ -901,29 +909,444 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb59-9"><a href="#cb59-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">quote =</span> <span class="st">""</span></span>
 <span id="cb59-10"><a href="#cb59-10" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb59-11"><a href="#cb59-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb59-12"><a href="#cb59-12" aria-hidden="true" tabindex="-1"></a><span class="fu">nrow</span>(gw_clicks)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>[1] 456</code></pre>
-</div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb61"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb61-1"><a href="#cb61-1" aria-hidden="true" tabindex="-1"></a>gw_clicks <span class="sc">|&gt;</span> <span class="fu">arrange</span>(<span class="fu">desc</span>(n)) <span class="sc">|&gt;</span> <span class="fu">slice_head</span>(<span class="at">n =</span> <span class="dv">10</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code># A tibble: 10 × 4
-   prev           curr                                      type      n
-   &lt;chr&gt;          &lt;chr&gt;                                     &lt;chr&gt; &lt;dbl&gt;
- 1 Global_warming Climate_change                            link   4249
- 2 Global_warming Scientific_consensus_on_climate_change    link   3030
- 3 Global_warming Greenhouse_gas                            link   2840
- 4 Global_warming Effects_of_global_warming                 link   2329
- 5 Global_warming Intergovernmental_Panel_on_Climate_Change link   1573
- 6 Global_warming Instrumental_temperature_record           link   1212
- 7 Global_warming Hyphen-minus                              other  1175
- 8 Global_warming Temperature_measurement                   link   1155
- 9 Global_warming Global_warming_(disambiguation)           link   1054
-10 Global_warming Climate_system                            link   1046</code></pre>
-</div>
+<span id="cb59-12"><a href="#cb59-12" aria-hidden="true" tabindex="-1"></a><span class="fu">nrow</span>(gw_clicks)</span>
+<span id="cb59-13"><a href="#cb59-13" aria-hidden="true" tabindex="-1"></a>gw_clicks <span class="sc">|&gt;</span> <span class="fu">arrange</span>(<span class="fu">desc</span>(n)) <span class="sc">|&gt;</span> <span class="fu">slice_head</span>(<span class="at">n =</span> <span class="dv">10</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>This makes more sense! For the purposes of this project, I am going to direct from Global_Warming for anything before August 21, 2020, and from Climate_change after that date. I am sure this title change has an effect on the top ten destination pages, but I suppose all we can do is push on and see what the data looks like before making any more choices on that matter.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb60"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a><span class="co"># every month we need clickstream data for: before and after of each wave and non-wave pair</span></span>
+<span id="cb60-2"><a href="#cb60-2" aria-hidden="true" tabindex="-1"></a>needed_months <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(wave_pairs, <span class="fu">bind_rows</span>(matches)) <span class="sc">|&gt;</span></span>
+<span id="cb60-3"><a href="#cb60-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(before_month, after_month) <span class="sc">|&gt;</span></span>
+<span id="cb60-4"><a href="#cb60-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_longer</span>(<span class="fu">everything</span>(), <span class="at">values_to =</span> <span class="st">"month"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb60-5"><a href="#cb60-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">distinct</span>(month) <span class="sc">|&gt;</span></span>
+<span id="cb60-6"><a href="#cb60-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(month) <span class="sc">|&gt;</span></span>
+<span id="cb60-7"><a href="#cb60-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb60-8"><a href="#cb60-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">ym          =</span> <span class="fu">format</span>(month, <span class="st">"%Y-%m"</span>),</span>
+<span id="cb60-9"><a href="#cb60-9" aria-hidden="true" tabindex="-1"></a>    <span class="co"># the page move happened Aug 21, 2020, so Aug 2020 is mixed (flagged below)</span></span>
+<span id="cb60-10"><a href="#cb60-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">source_page =</span> <span class="fu">case_when</span>(</span>
+<span id="cb60-11"><a href="#cb60-11" aria-hidden="true" tabindex="-1"></a>      month <span class="sc">&lt;</span>  <span class="fu">ymd</span>(<span class="st">"2020-08-01"</span>) <span class="sc">~</span> <span class="st">"Global_warming"</span>,</span>
+<span id="cb60-12"><a href="#cb60-12" aria-hidden="true" tabindex="-1"></a>      month <span class="sc">==</span> <span class="fu">ymd</span>(<span class="st">"2020-08-01"</span>) <span class="sc">~</span> <span class="st">"MIXED"</span>,</span>
+<span id="cb60-13"><a href="#cb60-13" aria-hidden="true" tabindex="-1"></a>      <span class="cn">TRUE</span>                       <span class="sc">~</span> <span class="st">"Climate_change"</span></span>
+<span id="cb60-14"><a href="#cb60-14" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb60-15"><a href="#cb60-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">file =</span> <span class="fu">paste0</span>(<span class="st">"clickstream-enwiki-"</span>, ym, <span class="st">".tsv.gz"</span>),</span>
+<span id="cb60-16"><a href="#cb60-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">url  =</span> <span class="fu">paste0</span>(<span class="st">"https://dumps.wikimedia.org/other/clickstream/"</span>, ym, <span class="st">"/"</span>, file)</span>
+<span id="cb60-17"><a href="#cb60-17" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb60-18"><a href="#cb60-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-19"><a href="#cb60-19" aria-hidden="true" tabindex="-1"></a>needed_months <span class="sc">|&gt;</span> <span class="fu">select</span>(month, source_page, file) <span class="sc">|&gt;</span> <span class="fu">print</span>(<span class="at">n =</span> <span class="cn">Inf</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 40 × 3
+   month      source_page    file                             
+   &lt;date&gt;     &lt;chr&gt;          &lt;chr&gt;                            
+ 1 2017-12-01 Global_warming clickstream-enwiki-2017-12.tsv.gz
+ 2 2018-01-01 Global_warming clickstream-enwiki-2018-01.tsv.gz
+ 3 2018-08-01 Global_warming clickstream-enwiki-2018-08.tsv.gz
+ 4 2018-09-01 Global_warming clickstream-enwiki-2018-09.tsv.gz
+ 5 2018-12-01 Global_warming clickstream-enwiki-2018-12.tsv.gz
+ 6 2019-01-01 Global_warming clickstream-enwiki-2019-01.tsv.gz
+ 7 2019-02-01 Global_warming clickstream-enwiki-2019-02.tsv.gz
+ 8 2019-03-01 Global_warming clickstream-enwiki-2019-03.tsv.gz
+ 9 2019-08-01 Global_warming clickstream-enwiki-2019-08.tsv.gz
+10 2019-09-01 Global_warming clickstream-enwiki-2019-09.tsv.gz
+11 2019-11-01 Global_warming clickstream-enwiki-2019-11.tsv.gz
+12 2019-12-01 Global_warming clickstream-enwiki-2019-12.tsv.gz
+13 2020-02-01 Global_warming clickstream-enwiki-2020-02.tsv.gz
+14 2020-03-01 Global_warming clickstream-enwiki-2020-03.tsv.gz
+15 2020-11-01 Climate_change clickstream-enwiki-2020-11.tsv.gz
+16 2020-12-01 Climate_change clickstream-enwiki-2020-12.tsv.gz
+17 2021-02-01 Climate_change clickstream-enwiki-2021-02.tsv.gz
+18 2021-03-01 Climate_change clickstream-enwiki-2021-03.tsv.gz
+19 2022-02-01 Climate_change clickstream-enwiki-2022-02.tsv.gz
+20 2022-03-01 Climate_change clickstream-enwiki-2022-03.tsv.gz
+21 2022-12-01 Climate_change clickstream-enwiki-2022-12.tsv.gz
+22 2023-01-01 Climate_change clickstream-enwiki-2023-01.tsv.gz
+23 2023-02-01 Climate_change clickstream-enwiki-2023-02.tsv.gz
+24 2023-03-01 Climate_change clickstream-enwiki-2023-03.tsv.gz
+25 2023-12-01 Climate_change clickstream-enwiki-2023-12.tsv.gz
+26 2024-01-01 Climate_change clickstream-enwiki-2024-01.tsv.gz
+27 2024-02-01 Climate_change clickstream-enwiki-2024-02.tsv.gz
+28 2024-03-01 Climate_change clickstream-enwiki-2024-03.tsv.gz
+29 2024-09-01 Climate_change clickstream-enwiki-2024-09.tsv.gz
+30 2024-10-01 Climate_change clickstream-enwiki-2024-10.tsv.gz
+31 2024-12-01 Climate_change clickstream-enwiki-2024-12.tsv.gz
+32 2025-01-01 Climate_change clickstream-enwiki-2025-01.tsv.gz
+33 2025-02-01 Climate_change clickstream-enwiki-2025-02.tsv.gz
+34 2025-03-01 Climate_change clickstream-enwiki-2025-03.tsv.gz
+35 2025-09-01 Climate_change clickstream-enwiki-2025-09.tsv.gz
+36 2025-10-01 Climate_change clickstream-enwiki-2025-10.tsv.gz
+37 2025-12-01 Climate_change clickstream-enwiki-2025-12.tsv.gz
+38 2026-01-01 Climate_change clickstream-enwiki-2026-01.tsv.gz
+39 2026-02-01 Climate_change clickstream-enwiki-2026-02.tsv.gz
+40 2026-03-01 Climate_change clickstream-enwiki-2026-03.tsv.gz</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb62"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a><span class="fu">nrow</span>(needed_months)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 40</code></pre>
+</div>
+</div>
+<p>Lets run a test to make sure this list of months was created correctly, and does not have any empty rows.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb64"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a><span class="co"># </span><span class="al">TEST</span><span class="co"> 3: month list is sensible</span></span>
+<span id="cb64-2"><a href="#cb64-2" aria-hidden="true" tabindex="-1"></a><span class="fu">stopifnot</span>(</span>
+<span id="cb64-3"><a href="#cb64-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">"no months to download"</span>            <span class="ot">=</span> <span class="fu">nrow</span>(needed_months) <span class="sc">&gt;</span> <span class="dv">0</span>,</span>
+<span id="cb64-4"><a href="#cb64-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">"a needed month is outside window"</span> <span class="ot">=</span> <span class="fu">all</span>(needed_months<span class="sc">$</span>month <span class="sc">&gt;=</span> study_start <span class="sc">&amp;</span> needed_months<span class="sc">$</span>month <span class="sc">&lt;=</span> study_end),</span>
+<span id="cb64-5"><a href="#cb64-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"a needed month falls in Aug 2020"</span> <span class="ot">=</span> <span class="sc">!</span><span class="fu">any</span>(needed_months<span class="sc">$</span>source_page <span class="sc">==</span> <span class="st">"MIXED"</span>)</span>
+<span id="cb64-6"><a href="#cb64-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb64-7"><a href="#cb64-7" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">"TEST 3 passed: needed months are inside the study window and none straddle the page move"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>TEST 3 passed: needed months are inside the study window and none straddle the page move</code></pre>
+</div>
+</div>
 </section>
+</section>
+<section id="the-big-download" class="level2">
+<h2 class="anchored" data-anchor-id="the-big-download">The Big Download</h2>
+<p>We are going to handle one month of clickstream data at a time. We will download, filter to the source page, save the filtered result, then delete the raw file. I have figured out the best way to do this is to write the download function once, then loop it over all of needed_months in a background job using a separate R script. It is called download_clickstream.R, and this is the cleaning script, shown in full below.</p>
+<pre><code>Warning in readLines("download_clickstream.R"): incomplete final line found on
+'download_clickstream.R'</code></pre>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb67"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb67-1"><a href="#cb67-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb67-2"><a href="#cb67-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb67-3"><a href="#cb67-3" aria-hidden="true" tabindex="-1"></a><span class="co"># for transparency i did not write the majority of this script, I found it on stackoverflow and modified it for this project</span></span>
+<span id="cb67-4"><a href="#cb67-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb67-5"><a href="#cb67-5" aria-hidden="true" tabindex="-1"></a>needed_months <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="st">"data/processed/needed_months.rds"</span>)</span>
+<span id="cb67-6"><a href="#cb67-6" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(<span class="st">"data/raw/clickstream"</span>, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb67-7"><a href="#cb67-7" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(<span class="st">"data/processed/clickstream"</span>, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb67-8"><a href="#cb67-8" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">timeout =</span> <span class="dv">3600</span>)</span>
+<span id="cb67-9"><a href="#cb67-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb67-10"><a href="#cb67-10" aria-hidden="true" tabindex="-1"></a>get_clicks <span class="ot">&lt;-</span> <span class="cf">function</span>(ym, file, url, source_page) {</span>
+<span id="cb67-11"><a href="#cb67-11" aria-hidden="true" tabindex="-1"></a>  out_path <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">"data/processed/clickstream/"</span>, ym, <span class="st">".rds"</span>)</span>
+<span id="cb67-12"><a href="#cb67-12" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">file.exists</span>(out_path)) <span class="fu">return</span>(<span class="fu">invisible</span>(<span class="cn">NULL</span>))</span>
+<span id="cb67-13"><a href="#cb67-13" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb67-14"><a href="#cb67-14" aria-hidden="true" tabindex="-1"></a>  t0 <span class="ot">&lt;-</span> <span class="fu">Sys.time</span>()</span>
+<span id="cb67-15"><a href="#cb67-15" aria-hidden="true" tabindex="-1"></a>  raw_path <span class="ot">&lt;-</span> <span class="fu">file.path</span>(<span class="st">"data/raw/clickstream"</span>, file)</span>
+<span id="cb67-16"><a href="#cb67-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">download.file</span>(url, <span class="at">destfile =</span> raw_path, <span class="at">mode =</span> <span class="st">"wb"</span>, <span class="at">quiet =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb67-17"><a href="#cb67-17" aria-hidden="true" tabindex="-1"></a>  t1 <span class="ot">&lt;-</span> <span class="fu">Sys.time</span>()</span>
+<span id="cb67-18"><a href="#cb67-18" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb67-19"><a href="#cb67-19" aria-hidden="true" tabindex="-1"></a>  <span class="co"># filter raw text lines BEFORE parsing; far faster than read_tsv_chunked</span></span>
+<span id="cb67-20"><a href="#cb67-20" aria-hidden="true" tabindex="-1"></a>  con <span class="ot">&lt;-</span> <span class="fu">gzcon</span>(<span class="fu">file</span>(raw_path, <span class="st">"rb"</span>))</span>
+<span id="cb67-21"><a href="#cb67-21" aria-hidden="true" tabindex="-1"></a>  prefix <span class="ot">&lt;-</span> <span class="fu">paste0</span>(source_page, <span class="st">"</span><span class="sc">\t</span><span class="st">"</span>)</span>
+<span id="cb67-22"><a href="#cb67-22" aria-hidden="true" tabindex="-1"></a>  keep <span class="ot">&lt;-</span> <span class="fu">character</span>()</span>
+<span id="cb67-23"><a href="#cb67-23" aria-hidden="true" tabindex="-1"></a>  <span class="cf">repeat</span> {</span>
+<span id="cb67-24"><a href="#cb67-24" aria-hidden="true" tabindex="-1"></a>    lines <span class="ot">&lt;-</span> <span class="fu">readLines</span>(con, <span class="at">n =</span> <span class="fl">1e6</span>)</span>
+<span id="cb67-25"><a href="#cb67-25" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">length</span>(lines) <span class="sc">==</span> <span class="dv">0</span>) <span class="cf">break</span></span>
+<span id="cb67-26"><a href="#cb67-26" aria-hidden="true" tabindex="-1"></a>    keep <span class="ot">&lt;-</span> <span class="fu">c</span>(keep, lines[<span class="fu">startsWith</span>(lines, prefix)])</span>
+<span id="cb67-27"><a href="#cb67-27" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb67-28"><a href="#cb67-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">close</span>(con)</span>
+<span id="cb67-29"><a href="#cb67-29" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb67-30"><a href="#cb67-30" aria-hidden="true" tabindex="-1"></a>  result <span class="ot">&lt;-</span> <span class="fu">read_tsv</span>(<span class="fu">I</span>(keep), <span class="at">col_names =</span> <span class="fu">c</span>(<span class="st">"prev"</span>, <span class="st">"curr"</span>, <span class="st">"type"</span>, <span class="st">"n"</span>),</span>
+<span id="cb67-31"><a href="#cb67-31" aria-hidden="true" tabindex="-1"></a>                     <span class="at">col_types =</span> <span class="st">"cccd"</span>, <span class="at">quote =</span> <span class="st">""</span>) <span class="sc">|&gt;</span></span>
+<span id="cb67-32"><a href="#cb67-32" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">month =</span> <span class="fu">ymd</span>(<span class="fu">paste0</span>(ym, <span class="st">"-01"</span>)))</span>
+<span id="cb67-33"><a href="#cb67-33" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb67-34"><a href="#cb67-34" aria-hidden="true" tabindex="-1"></a>  <span class="fu">saveRDS</span>(result, out_path)</span>
+<span id="cb67-35"><a href="#cb67-35" aria-hidden="true" tabindex="-1"></a>  <span class="fu">file.remove</span>(raw_path)</span>
+<span id="cb67-36"><a href="#cb67-36" aria-hidden="true" tabindex="-1"></a>  <span class="fu">message</span>(ym, <span class="st">": download "</span>, <span class="fu">round</span>(<span class="fu">difftime</span>(t1, t0, <span class="at">units =</span> <span class="st">"mins"</span>), <span class="dv">1</span>),</span>
+<span id="cb67-37"><a href="#cb67-37" aria-hidden="true" tabindex="-1"></a>          <span class="st">" min, filter "</span>, <span class="fu">round</span>(<span class="fu">difftime</span>(<span class="fu">Sys.time</span>(), t1, <span class="at">units =</span> <span class="st">"mins"</span>), <span class="dv">1</span>), <span class="st">" min"</span>)</span>
+<span id="cb67-38"><a href="#cb67-38" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb67-39"><a href="#cb67-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb67-40"><a href="#cb67-40" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_len</span>(<span class="fu">nrow</span>(needed_months))) {</span>
+<span id="cb67-41"><a href="#cb67-41" aria-hidden="true" tabindex="-1"></a>  m <span class="ot">&lt;-</span> needed_months[i, ]</span>
+<span id="cb67-42"><a href="#cb67-42" aria-hidden="true" tabindex="-1"></a>  <span class="fu">message</span>(<span class="st">"["</span>, i, <span class="st">"/"</span>, <span class="fu">nrow</span>(needed_months), <span class="st">"] starting "</span>, m<span class="sc">$</span>ym)</span>
+<span id="cb67-43"><a href="#cb67-43" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tryCatch</span>(</span>
+<span id="cb67-44"><a href="#cb67-44" aria-hidden="true" tabindex="-1"></a>    <span class="fu">get_clicks</span>(m<span class="sc">$</span>ym, m<span class="sc">$</span>file, m<span class="sc">$</span>url, m<span class="sc">$</span>source_page),</span>
+<span id="cb67-45"><a href="#cb67-45" aria-hidden="true" tabindex="-1"></a>    <span class="at">error =</span> <span class="cf">function</span>(e) <span class="fu">message</span>(<span class="st">"FAILED "</span>, m<span class="sc">$</span>ym, <span class="st">": "</span>, <span class="fu">conditionMessage</span>(e))</span>
+<span id="cb67-46"><a href="#cb67-46" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb67-47"><a href="#cb67-47" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb67-48"><a href="#cb67-48" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">"DONE"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The chunk below saves the month list for the script, then runs the script <strong>only if some months are missing</strong>. On my computer all 40 months were already saved, so rendering skips the download. If someone renders this from a fresh copy without the saved data, it downloads whatever is missing (this takes a long time).</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb68"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb68-1"><a href="#cb68-1" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(<span class="st">"data/processed/clickstream"</span>, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb68-2"><a href="#cb68-2" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(needed_months, <span class="st">"data/processed/needed_months.rds"</span>)</span>
+<span id="cb68-3"><a href="#cb68-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb68-4"><a href="#cb68-4" aria-hidden="true" tabindex="-1"></a>n_saved <span class="ot">&lt;-</span> <span class="fu">length</span>(<span class="fu">list.files</span>(<span class="st">"data/processed/clickstream"</span>, <span class="at">pattern =</span> <span class="st">"</span><span class="sc">\\</span><span class="st">.rds$"</span>))</span>
+<span id="cb68-5"><a href="#cb68-5" aria-hidden="true" tabindex="-1"></a>n_saved   <span class="co"># how many months are already saved</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 40</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb70"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb70-1"><a href="#cb70-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (n_saved <span class="sc">&lt;</span> <span class="fu">nrow</span>(needed_months)) {</span>
+<span id="cb70-2"><a href="#cb70-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">source</span>(<span class="st">"download_clickstream.R"</span>)</span>
+<span id="cb70-3"><a href="#cb70-3" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>We first check that the saved result for the first month looks right.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb71"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a>first <span class="ot">&lt;-</span> needed_months[<span class="dv">1</span>, ]</span>
+<span id="cb71-2"><a href="#cb71-2" aria-hidden="true" tabindex="-1"></a>test_clicks <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="fu">paste0</span>(<span class="st">"data/processed/clickstream/"</span>, first<span class="sc">$</span>ym, <span class="st">".rds"</span>))</span>
+<span id="cb71-3"><a href="#cb71-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb71-4"><a href="#cb71-4" aria-hidden="true" tabindex="-1"></a><span class="fu">nrow</span>(test_clicks)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 243</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb73"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb73-1"><a href="#cb73-1" aria-hidden="true" tabindex="-1"></a>test_clicks <span class="sc">|&gt;</span> <span class="fu">arrange</span>(<span class="fu">desc</span>(n)) <span class="sc">|&gt;</span> <span class="fu">slice_head</span>(<span class="at">n =</span> <span class="dv">10</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 10 × 5
+   prev           curr                                    type      n month     
+   &lt;chr&gt;          &lt;chr&gt;                                   &lt;chr&gt; &lt;dbl&gt; &lt;date&gt;    
+ 1 Global_warming Greenhouse_gas                          link   1379 2017-12-01
+ 2 Global_warming Scientific_opinion_on_climate_change    link   1187 2017-12-01
+ 3 Global_warming Hyphen-minus                            other  1039 2017-12-01
+ 4 Global_warming Instrumental_temperature_record         link   1037 2017-12-01
+ 5 Global_warming Intergovernmental_Panel_on_Climate_Cha… link   1006 2017-12-01
+ 6 Global_warming Climate_change                          link    780 2017-12-01
+ 7 Global_warming Global_warming_(disambiguation)         link    765 2017-12-01
+ 8 Global_warming Attribution_of_recent_climate_change    link    624 2017-12-01
+ 9 Global_warming Climate                                 link    540 2017-12-01
+10 Global_warming Paleoclimatology                        link    501 2017-12-01</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb75"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb75-1"><a href="#cb75-1" aria-hidden="true" tabindex="-1"></a><span class="co"># </span><span class="al">TEST</span><span class="co"> 4: the first month was filtered and saved correctly</span></span>
+<span id="cb75-2"><a href="#cb75-2" aria-hidden="true" tabindex="-1"></a><span class="fu">stopifnot</span>(</span>
+<span id="cb75-3"><a href="#cb75-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">"no rows came back"</span>            <span class="ot">=</span> <span class="fu">nrow</span>(test_clicks) <span class="sc">&gt;</span> <span class="dv">0</span>,</span>
+<span id="cb75-4"><a href="#cb75-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">"wrong source page in results"</span> <span class="ot">=</span> <span class="fu">all</span>(test_clicks<span class="sc">$</span>prev <span class="sc">==</span> first<span class="sc">$</span>source_page),</span>
+<span id="cb75-5"><a href="#cb75-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"wrong month in results"</span>       <span class="ot">=</span> <span class="fu">all</span>(test_clicks<span class="sc">$</span>month <span class="sc">==</span> first<span class="sc">$</span>month),</span>
+<span id="cb75-6"><a href="#cb75-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">"raw file was not deleted"</span>     <span class="ot">=</span> <span class="sc">!</span><span class="fu">file.exists</span>(<span class="fu">file.path</span>(<span class="st">"data/raw/clickstream"</span>, first<span class="sc">$</span>file)),</span>
+<span id="cb75-7"><a href="#cb75-7" aria-hidden="true" tabindex="-1"></a>  <span class="st">"processed file was not saved"</span> <span class="ot">=</span> <span class="fu">file.exists</span>(<span class="fu">paste0</span>(<span class="st">"data/processed/clickstream/"</span>, first<span class="sc">$</span>ym, <span class="st">".rds"</span>))</span>
+<span id="cb75-8"><a href="#cb75-8" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb75-9"><a href="#cb75-9" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">"TEST 4 passed: first month filtered, saved and cleaned up"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>TEST 4 passed: first month filtered, saved and cleaned up</code></pre>
+</div>
+</div>
+<p>Ok, this seems to have worked and passed the test. Time to load all the files.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb77"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb77-1"><a href="#cb77-1" aria-hidden="true" tabindex="-1"></a>all_clicks <span class="ot">&lt;-</span> <span class="fu">list.files</span>(<span class="st">"data/processed/clickstream"</span>, <span class="at">pattern =</span> <span class="st">"</span><span class="sc">\\</span><span class="st">.rds$"</span>, <span class="at">full.names =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span></span>
+<span id="cb77-2"><a href="#cb77-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map</span>(readRDS) <span class="sc">|&gt;</span></span>
+<span id="cb77-3"><a href="#cb77-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">bind_rows</span>()</span>
+<span id="cb77-4"><a href="#cb77-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb77-5"><a href="#cb77-5" aria-hidden="true" tabindex="-1"></a><span class="fu">nrow</span>(all_clicks)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 10657</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb79"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb79-1"><a href="#cb79-1" aria-hidden="true" tabindex="-1"></a>all_clicks <span class="sc">|&gt;</span> <span class="fu">count</span>(month)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 40 × 2
+   month          n
+   &lt;date&gt;     &lt;int&gt;
+ 1 2017-12-01   243
+ 2 2018-01-01   268
+ 3 2018-08-01   328
+ 4 2018-09-01   478
+ 5 2018-12-01   264
+ 6 2019-01-01   507
+ 7 2019-02-01   395
+ 8 2019-03-01   295
+ 9 2019-08-01   446
+10 2019-09-01   456
+# ℹ 30 more rows</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb81"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb81-1"><a href="#cb81-1" aria-hidden="true" tabindex="-1"></a><span class="co"># </span><span class="al">TEST</span><span class="co"> 5: every needed month was downloaded and filtered correctly</span></span>
+<span id="cb81-2"><a href="#cb81-2" aria-hidden="true" tabindex="-1"></a>page_check <span class="ot">&lt;-</span></span>
+<span id="cb81-3"><a href="#cb81-3" aria-hidden="true" tabindex="-1"></a>  all_clicks <span class="sc">|&gt;</span></span>
+<span id="cb81-4"><a href="#cb81-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">distinct</span>(month, prev) <span class="sc">|&gt;</span></span>
+<span id="cb81-5"><a href="#cb81-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(<span class="fu">select</span>(needed_months, month, source_page), <span class="at">by =</span> <span class="st">"month"</span>)</span>
+<span id="cb81-6"><a href="#cb81-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb81-7"><a href="#cb81-7" aria-hidden="true" tabindex="-1"></a><span class="fu">stopifnot</span>(</span>
+<span id="cb81-8"><a href="#cb81-8" aria-hidden="true" tabindex="-1"></a>  <span class="st">"a needed month has no rows"</span>      <span class="ot">=</span> <span class="fu">setequal</span>(<span class="fu">unique</span>(all_clicks<span class="sc">$</span>month), needed_months<span class="sc">$</span>month),</span>
+<span id="cb81-9"><a href="#cb81-9" aria-hidden="true" tabindex="-1"></a>  <span class="st">"wrong source page in some rows"</span>  <span class="ot">=</span> <span class="fu">all</span>(page_check<span class="sc">$</span>prev <span class="sc">==</span> page_check<span class="sc">$</span>source_page),</span>
+<span id="cb81-10"><a href="#cb81-10" aria-hidden="true" tabindex="-1"></a>  <span class="st">"a raw file was left on disk"</span>     <span class="ot">=</span> <span class="fu">length</span>(<span class="fu">list.files</span>(<span class="st">"data/raw/clickstream"</span>)) <span class="sc">==</span> <span class="dv">0</span></span>
+<span id="cb81-11"><a href="#cb81-11" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb81-12"><a href="#cb81-12" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">"TEST 5 passed: all months downloaded, filtered and cleaned up"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>TEST 5 passed: all months downloaded, filtered and cleaned up</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb83"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb83-1"><a href="#cb83-1" aria-hidden="true" tabindex="-1"></a><span class="co"># </span><span class="al">TEST</span><span class="co"> 6: the click data itself is sane</span></span>
+<span id="cb83-2"><a href="#cb83-2" aria-hidden="true" tabindex="-1"></a><span class="fu">stopifnot</span>(</span>
+<span id="cb83-3"><a href="#cb83-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">"only the two source pages should appear"</span> <span class="ot">=</span> <span class="fu">all</span>(all_clicks<span class="sc">$</span>prev <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"Global_warming"</span>, <span class="st">"Climate_change"</span>)),</span>
+<span id="cb83-4"><a href="#cb83-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">"a click count is missing or not positive"</span> <span class="ot">=</span> <span class="fu">all</span>(<span class="sc">!</span><span class="fu">is.na</span>(all_clicks<span class="sc">$</span>n) <span class="sc">&amp;</span> all_clicks<span class="sc">$</span>n <span class="sc">&gt;</span> <span class="dv">0</span>),</span>
+<span id="cb83-5"><a href="#cb83-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"a row is duplicated within a month"</span>       <span class="ot">=</span> <span class="sc">!</span><span class="fu">any</span>(<span class="fu">duplicated</span>(<span class="fu">select</span>(all_clicks, month, prev, curr, type)))</span>
+<span id="cb83-6"><a href="#cb83-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb83-7"><a href="#cb83-7" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">"TEST 6 passed: only the two source pages, all click counts are positive, no duplicate rows"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>TEST 6 passed: only the two source pages, all click counts are positive, no duplicate rows</code></pre>
+</div>
+</div>
+<p>Wow. It feels like we would never get here. But we have our wikipedia data cleaned. Lets explore!</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb85"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb85-1"><a href="#cb85-1" aria-hidden="true" tabindex="-1"></a>link_clicks <span class="ot">&lt;-</span> all_clicks <span class="sc">|&gt;</span> <span class="fu">filter</span>(type <span class="sc">==</span> <span class="st">"link"</span>) <span class="co"># filters for only article to article clicks</span></span>
+<span id="cb85-2"><a href="#cb85-2" aria-hidden="true" tabindex="-1"></a> </span>
+<span id="cb85-3"><a href="#cb85-3" aria-hidden="true" tabindex="-1"></a>link_clicks <span class="sc">|&gt;</span></span>
+<span id="cb85-4"><a href="#cb85-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(curr) <span class="sc">|&gt;</span></span>
+<span id="cb85-5"><a href="#cb85-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">total =</span> <span class="fu">sum</span>(n)) <span class="sc">|&gt;</span></span>
+<span id="cb85-6"><a href="#cb85-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice_max</span>(total, <span class="at">n =</span> <span class="dv">10</span>) <span class="co"># top ten destinations</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 10 × 2
+   curr                                      total
+   &lt;chr&gt;                                     &lt;dbl&gt;
+ 1 Greenhouse_gas                            50443
+ 2 Global_warming_(disambiguation)           29039
+ 3 Scientific_consensus_on_climate_change    26351
+ 4 Climate_variability_and_change            25316
+ 5 Instrumental_temperature_record           23101
+ 6 Climate_change                            22095
+ 7 Effects_of_global_warming                 20993
+ 8 Intergovernmental_Panel_on_Climate_Change 20099
+ 9 Attribution_of_recent_climate_change      16214
+10 Effects_of_climate_change                 15678</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb87"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb87-1"><a href="#cb87-1" aria-hidden="true" tabindex="-1"></a>link_clicks <span class="sc">|&gt;</span></span>
+<span id="cb87-2"><a href="#cb87-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(prev, curr) <span class="sc">|&gt;</span></span>
+<span id="cb87-3"><a href="#cb87-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">total =</span> <span class="fu">sum</span>(n)) <span class="sc">|&gt;</span></span>
+<span id="cb87-4"><a href="#cb87-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice_max</span>(total, <span class="at">n =</span> <span class="dv">10</span>) <span class="co"># top ten for each source page</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>`summarise()` has regrouped the output.
+ℹ Summaries were computed grouped by prev and curr.
+ℹ Output is grouped by prev.
+ℹ Use `summarise(.groups = "drop_last")` to silence this message.
+ℹ Use `summarise(.by = c(prev, curr))` for per-operation grouping
+  (`?dplyr::dplyr_by`) instead.</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 20 × 3
+# Groups:   prev [2]
+   prev           curr                                      total
+   &lt;chr&gt;          &lt;chr&gt;                                     &lt;dbl&gt;
+ 1 Climate_change Climate_variability_and_change            25316
+ 2 Climate_change Greenhouse_gas                            22348
+ 3 Climate_change Effects_of_climate_change                 15678
+ 4 Climate_change Global_warming_(disambiguation)           15171
+ 5 Climate_change Scientific_consensus_on_climate_change    14759
+ 6 Climate_change Fossil_fuel                                9731
+ 7 Climate_change Global_surface_temperature                 8070
+ 8 Climate_change Climate_change_(disambiguation)            7894
+ 9 Climate_change Climate_change_denial                      7868
+10 Climate_change Climate_system                             7252
+11 Global_warming Greenhouse_gas                            28095
+12 Global_warming Climate_change                            22095
+13 Global_warming Effects_of_global_warming                 20993
+14 Global_warming Instrumental_temperature_record           17681
+15 Global_warming Intergovernmental_Panel_on_Climate_Change 17563
+16 Global_warming Global_warming_(disambiguation)           13868
+17 Global_warming Climate_change_(general_concept)          13175
+18 Global_warming Attribution_of_recent_climate_change      12982
+19 Global_warming Scientific_opinion_on_climate_change      12489
+20 Global_warming Scientific_consensus_on_climate_change    11592</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb90"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb90-1"><a href="#cb90-1" aria-hidden="true" tabindex="-1"></a>month_totals <span class="ot">&lt;-</span> link_clicks <span class="sc">|&gt;</span></span>
+<span id="cb90-2"><a href="#cb90-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(month) <span class="sc">|&gt;</span></span>
+<span id="cb90-3"><a href="#cb90-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">total =</span> <span class="fu">sum</span>(n)) <span class="co"># total clicks per month</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>Lets use this preliminary investigation of the wikipedia to practice making data visualizations. The end goal remains to be comparing the change in top ten destinations during wave vs non wave months, but I need to practice my R skills before digging into that.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb91"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb91-1"><a href="#cb91-1" aria-hidden="true" tabindex="-1"></a>top10 <span class="ot">&lt;-</span> link_clicks <span class="sc">|&gt;</span></span>
+<span id="cb91-2"><a href="#cb91-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(prev, curr) <span class="sc">|&gt;</span></span>
+<span id="cb91-3"><a href="#cb91-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">total =</span> <span class="fu">sum</span>(n)) <span class="sc">|&gt;</span></span>
+<span id="cb91-4"><a href="#cb91-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice_max</span>(total, <span class="at">n =</span> <span class="dv">10</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>`summarise()` has regrouped the output.
+ℹ Summaries were computed grouped by prev and curr.
+ℹ Output is grouped by prev.
+ℹ Use `summarise(.groups = "drop_last")` to silence this message.
+ℹ Use `summarise(.by = c(prev, curr))` for per-operation grouping
+  (`?dplyr::dplyr_by`) instead.</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb93"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb93-1"><a href="#cb93-1" aria-hidden="true" tabindex="-1"></a>top10 <span class="ot">&lt;-</span> top10 <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">curr =</span> <span class="fu">fct_reorder</span>(curr, total))</span>
+<span id="cb93-2"><a href="#cb93-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb93-3"><a href="#cb93-3" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(top10, <span class="fu">aes</span>(<span class="at">x =</span> total, <span class="at">y =</span> curr)) <span class="sc">+</span></span>
+<span id="cb93-4"><a href="#cb93-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_col</span>(<span class="at">fill =</span> <span class="st">"#E0218A"</span>) <span class="sc">+</span></span>
+<span id="cb93-5"><a href="#cb93-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>prev, <span class="at">scales =</span> <span class="st">"free_y"</span>) <span class="sc">+</span></span>
+<span id="cb93-6"><a href="#cb93-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_continuous</span>(<span class="at">labels =</span> scales<span class="sc">::</span>comma, <span class="at">n.breaks =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
+<span id="cb93-7"><a href="#cb93-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Total clicks"</span>, <span class="at">y =</span> <span class="cn">NULL</span>, <span class="at">title =</span> <span class="st">"Where do readers go next?"</span>) <span class="sc">+</span></span>
+<span id="cb93-8"><a href="#cb93-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MilestoneTwo_files/figure-html/unnamed-chunk-17-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As a treat, I saw on social media that you can make your R charts glow with a package called ggfx. This is the same as the last chart but glowing. (If ggfx is not installed, the glow is skipped and the chart is drawn without it.)</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb94"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb94-1"><a href="#cb94-1" aria-hidden="true" tabindex="-1"></a><span class="co"># is ggfx installed? if not, glow() just returns the plain layer so the notebook still renders</span></span>
+<span id="cb94-2"><a href="#cb94-2" aria-hidden="true" tabindex="-1"></a>has_ggfx <span class="ot">&lt;-</span> <span class="fu">requireNamespace</span>(<span class="st">"ggfx"</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb94-3"><a href="#cb94-3" aria-hidden="true" tabindex="-1"></a>glow <span class="ot">&lt;-</span> <span class="cf">function</span>(layer, ...) {</span>
+<span id="cb94-4"><a href="#cb94-4" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (has_ggfx) ggfx<span class="sc">::</span><span class="fu">with_outer_glow</span>(layer, ...) <span class="cf">else</span> layer</span>
+<span id="cb94-5"><a href="#cb94-5" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb94-6"><a href="#cb94-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb94-7"><a href="#cb94-7" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(top10, <span class="fu">aes</span>(<span class="at">x =</span> total, <span class="at">y =</span> curr)) <span class="sc">+</span></span>
+<span id="cb94-8"><a href="#cb94-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">glow</span>(</span>
+<span id="cb94-9"><a href="#cb94-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_col</span>(<span class="at">fill =</span> <span class="st">"#FF3FA4"</span>),</span>
+<span id="cb94-10"><a href="#cb94-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"#FF3FA4"</span>, <span class="at">sigma =</span> <span class="dv">4</span>, <span class="at">expand =</span> <span class="dv">1</span></span>
+<span id="cb94-11"><a href="#cb94-11" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb94-12"><a href="#cb94-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>prev, <span class="at">scales =</span> <span class="st">"free_y"</span>) <span class="sc">+</span></span>
+<span id="cb94-13"><a href="#cb94-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_continuous</span>(<span class="at">labels =</span> scales<span class="sc">::</span>comma, <span class="at">n.breaks =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
+<span id="cb94-14"><a href="#cb94-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Total clicks"</span>, <span class="at">y =</span> <span class="cn">NULL</span>, <span class="at">title =</span> <span class="st">"Where do readers go next?"</span>) <span class="sc">+</span></span>
+<span id="cb94-15"><a href="#cb94-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb94-16"><a href="#cb94-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb94-17"><a href="#cb94-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.background  =</span> <span class="fu">element_rect</span>(<span class="at">fill =</span> <span class="st">"#0D0D1A"</span>, <span class="at">colour =</span> <span class="cn">NA</span>),</span>
+<span id="cb94-18"><a href="#cb94-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.background =</span> <span class="fu">element_rect</span>(<span class="at">fill =</span> <span class="st">"#0D0D1A"</span>, <span class="at">colour =</span> <span class="cn">NA</span>),</span>
+<span id="cb94-19"><a href="#cb94-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.grid       =</span> <span class="fu">element_line</span>(<span class="at">colour =</span> <span class="st">"#2A2A44"</span>),</span>
+<span id="cb94-20"><a href="#cb94-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">text             =</span> <span class="fu">element_text</span>(<span class="at">colour =</span> <span class="st">"white"</span>),</span>
+<span id="cb94-21"><a href="#cb94-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.text        =</span> <span class="fu">element_text</span>(<span class="at">colour =</span> <span class="st">"white"</span>),</span>
+<span id="cb94-22"><a href="#cb94-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">strip.text       =</span> <span class="fu">element_text</span>(<span class="at">colour =</span> <span class="st">"white"</span>, <span class="at">face =</span> <span class="st">"bold"</span>)</span>
+<span id="cb94-23"><a href="#cb94-23" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MilestoneTwo_files/figure-html/unnamed-chunk-18-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Now, as a final chart for this milestone, I want to explore if wave months have more clicks than non wave months. Of course, we will make this one glow too.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb95"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb95-1"><a href="#cb95-1" aria-hidden="true" tabindex="-1"></a>wave_months <span class="ot">&lt;-</span> monthly_window <span class="sc">|&gt;</span> <span class="fu">filter</span>(wave) <span class="sc">|&gt;</span> <span class="fu">pull</span>(month)</span>
+<span id="cb95-2"><a href="#cb95-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb95-3"><a href="#cb95-3" aria-hidden="true" tabindex="-1"></a>plot_data <span class="ot">&lt;-</span> month_totals <span class="sc">|&gt;</span></span>
+<span id="cb95-4"><a href="#cb95-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">is_wave =</span> month <span class="sc">%in%</span> wave_months)</span>
+<span id="cb95-5"><a href="#cb95-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb95-6"><a href="#cb95-6" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(plot_data, <span class="fu">aes</span>(<span class="at">x =</span> month, <span class="at">y =</span> total, <span class="at">fill =</span> is_wave)) <span class="sc">+</span></span>
+<span id="cb95-7"><a href="#cb95-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_col</span>(<span class="at">data =</span> <span class="fu">filter</span>(plot_data, <span class="sc">!</span>is_wave), <span class="at">width =</span> <span class="dv">20</span>) <span class="sc">+</span></span>
+<span id="cb95-8"><a href="#cb95-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">glow</span>(</span>
+<span id="cb95-9"><a href="#cb95-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_col</span>(<span class="at">data =</span> <span class="fu">filter</span>(plot_data, is_wave), <span class="at">width =</span> <span class="dv">20</span>),</span>
+<span id="cb95-10"><a href="#cb95-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"#FF3FA4"</span>, <span class="at">sigma =</span> <span class="dv">4</span>, <span class="at">expand =</span> <span class="dv">1</span></span>
+<span id="cb95-11"><a href="#cb95-11" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb95-12"><a href="#cb95-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values =</span> <span class="fu">c</span>(<span class="st">"#5C5C7A"</span>, <span class="st">"#FF3FA4"</span>), <span class="at">name =</span> <span class="st">"Wave month?"</span>) <span class="sc">+</span></span>
+<span id="cb95-13"><a href="#cb95-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="st">"Total clicks"</span>, <span class="at">title =</span> <span class="st">"Clicks leaving the source page, by month"</span>) <span class="sc">+</span></span>
+<span id="cb95-14"><a href="#cb95-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb95-15"><a href="#cb95-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb95-16"><a href="#cb95-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.background  =</span> <span class="fu">element_rect</span>(<span class="at">fill =</span> <span class="st">"#0D0D1A"</span>, <span class="at">colour =</span> <span class="cn">NA</span>),</span>
+<span id="cb95-17"><a href="#cb95-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.background =</span> <span class="fu">element_rect</span>(<span class="at">fill =</span> <span class="st">"#0D0D1A"</span>, <span class="at">colour =</span> <span class="cn">NA</span>),</span>
+<span id="cb95-18"><a href="#cb95-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.grid       =</span> <span class="fu">element_line</span>(<span class="at">colour =</span> <span class="st">"#2A2A44"</span>),</span>
+<span id="cb95-19"><a href="#cb95-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">text             =</span> <span class="fu">element_text</span>(<span class="at">colour =</span> <span class="st">"white"</span>),</span>
+<span id="cb95-20"><a href="#cb95-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.text        =</span> <span class="fu">element_text</span>(<span class="at">colour =</span> <span class="st">"white"</span>),</span>
+<span id="cb95-21"><a href="#cb95-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.text      =</span> <span class="fu">element_text</span>(<span class="at">colour =</span> <span class="st">"white"</span>)</span>
+<span id="cb95-22"><a href="#cb95-22" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MilestoneTwo_files/figure-html/unnamed-chunk-19-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The pink wave bars are not reliably taller than the grey ones next to them, meaning that at this level, we can not claim that waves boost Wikipedia clicks. Interestingly, clicks drop a lot across the x axis, leading me to believe that long-term changes in Wikipedia traffic are swamping any wave effect, so a before/after pair comparison is a fairer test. We will get to this by the next milestone!</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb96"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb96-1"><a href="#cb96-1" aria-hidden="true" tabindex="-1"></a><span class="co"># check the claim in my note below: which month had the most clicks, and was it a wave month?</span></span>
+<span id="cb96-2"><a href="#cb96-2" aria-hidden="true" tabindex="-1"></a>top_month <span class="ot">&lt;-</span> month_totals <span class="sc">|&gt;</span> <span class="fu">arrange</span>(<span class="fu">desc</span>(total)) <span class="sc">|&gt;</span> <span class="fu">slice</span>(<span class="dv">1</span>)</span>
+<span id="cb96-3"><a href="#cb96-3" aria-hidden="true" tabindex="-1"></a>top_month_is_wave <span class="ot">&lt;-</span> top_month<span class="sc">$</span>month <span class="sc">%in%</span> wave_months</span>
+<span id="cb96-4"><a href="#cb96-4" aria-hidden="true" tabindex="-1"></a>top_month</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 2
+  month      total
+  &lt;date&gt;     &lt;dbl&gt;
+1 2019-11-01 53760</code></pre>
+</div>
+</div>
+</section>
+<section id="note-what-surprised-me-in-the-data" class="level2">
+<h2 class="anchored" data-anchor-id="note-what-surprised-me-in-the-data">Note: What surprised me in the data</h2>
+<p>The first thing that surprised me was at the data infrastructure level, where the CCC data had different column names for the same measurements across its three phases. It made me remember that even at the Harvard level, there are some basic data management principles that you may not think about at the collection level that people using your data will certainly come face to face with. This was a good reminder to use best practices even in class assignments!</p>
+<p>At the data level, I was surprised about:</p>
+<ul>
+<li><strong>The article I was studying changed its name.</strong> Climate_change sends about 13,000 readers to Global_warming in September 2019, which looked backwards until I found out the page was moved on August 21, 2020. So the source page switches partway through my study window, and click totals from before and after that date come from two different articles.</li>
+<li><strong>Wave months do not reliably boost click levels.</strong> The month with the highest click level was not a wave month.</li>
+<li><strong>My biggest protest month (March 2026) had one of the lowest click counts.</strong> I believe this is because the protest counts come from the large multi-tagged protests and not explicitly climate related protests. This made me rethink including the amount of multitagged protests that I decided on keeping.</li>
+<li><strong>Clicks fall a lot over the years.</strong> Monthly clicks drop from roughly 40-55 thousand in 2019-2020 to about 10-20 thousand by 2026, whether or not it is a wave month. That decline is bigger than any wave effect I can see.</li>
+<li><strong>The cleaned data is tiny.</strong> I braced for “one million mb”, but after filtering to one source page, each month is only a few hundred to a few thousand rows. The slow part was parsing the huge raw files, not storing the results.</li>
+</ul>
 </section>
 
 </main>

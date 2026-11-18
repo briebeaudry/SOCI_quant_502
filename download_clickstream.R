@@ -1,5 +1,7 @@
 library(tidyverse)
 
+# for transparency i did not write the majority of this script, I found it on stackoverflow and modified it for this project
+
 needed_months <- readRDS("data/processed/needed_months.rds")
 dir.create("data/raw/clickstream", recursive = TRUE, showWarnings = FALSE)
 dir.create("data/processed/clickstream", recursive = TRUE, showWarnings = FALSE)
