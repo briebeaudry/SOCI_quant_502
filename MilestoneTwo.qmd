@@ -411,6 +411,7 @@ Now we know what wikipedia data we are going to download.
 Before I go ahead and download one million mb of clickstream data, lets download one month and test out our data cleaning.
 
 ```{r}
+#| eval: false
 dir.create("data/raw/clickstream", recursive = TRUE, showWarnings = FALSE)
 options(timeout = 3600)
 
@@ -450,6 +451,7 @@ Yes! I have googled this query and a formal "requested move" discussion opened o
 Therefore, March 2020 wave and earlier will be Global_warming, Nov 2020 wave and after will be Climate_change. 
 
 ```{r}
+#| eval: false
 gw_clicks <- read_tsv_chunked(
   "data/raw/clickstream/clickstream-enwiki-2019-09.tsv.gz",
   callback = DataFrameCallback$new(
@@ -468,6 +470,134 @@ gw_clicks |> arrange(desc(n)) |> slice_head(n = 10)
 This makes more sense! For the purposes of this project, I am going to direct from Global_Warming for anything before August 21, 2020, and from Climate_change after that date. I am sure this title change has an effect on the top ten destination pages, but I suppose all we can do is push on and see what the data looks like before making any more choices on that matter. 
 
 
+```{r}
+#| label: needed-months
+
+# every month we need clickstream data for: before and after of each wave and non-wave pair
+needed_months <- bind_rows(wave_pairs, bind_rows(matches)) |>
+  select(before_month, after_month) |>
+  pivot_longer(everything(), values_to = "month") |>
+  distinct(month) |>
+  arrange(month) |>
+  mutate(
+    ym          = format(month, "%Y-%m"),
+    # the page move happened Aug 21, 2020, so Aug 2020 is mixed (flagged below)
+    source_page = case_when(
+      month <  ymd("2020-08-01") ~ "Global_warming",
+      month == ymd("2020-08-01") ~ "MIXED",
+      TRUE                       ~ "Climate_change"
+    ),
+    file = paste0("clickstream-enwiki-", ym, ".tsv.gz"),
+    url  = paste0("https://dumps.wikimedia.org/other/clickstream/", ym, "/", file)
+  )
+
+needed_months |> select(month, source_page, file) |> print(n = Inf)
+nrow(needed_months)
+```
+Lets run a test to make sure this list of months was created correctly, and does not have any empty rows.
+```{r}
+#| label: test-3-needed-months
+# TEST 3: month list is sensible
+stopifnot(
+  "no months to download"            = nrow(needed_months) > 0,
+  "a needed month is outside window" = all(needed_months$month >= study_start & needed_months$month <= study_end),
+  "a needed month falls in Aug 2020" = !any(needed_months$source_page == "MIXED")
+)
+message("TEST 3 passed: needed months are inside the study window and none straddle the page move")
+```
+
+## The Big Download
+
+We are going to handle one month of clickstream data at a time. We will download, filter to the source page, save the filtered result, then delete the raw file. I have figured out the best way to do this is to write the download function once, then loop it over all of needed_months in a background job using a separate R script. It is called download_clickstream.r.
+
+We first test the script on one month to make sure it does what we want.
+
+```{r}
+#| label: download-function
+
+dir.create("data/raw/clickstream", recursive = TRUE, showWarnings = FALSE)
+dir.create("data/processed/clickstream", recursive = TRUE, showWarnings = FALSE)
+options(timeout = 3600)
+
+get_clicks <- function(ym, file, url, source_page) {
+  out_path <- paste0("data/processed/clickstream/", ym, ".rds")
+
+  # skip months we've already processed
+  if (file.exists(out_path)) return(invisible(readRDS(out_path)))
+
+  raw_path <- file.path("data/raw/clickstream", file)
+  download.file(url, destfile = raw_path, mode = "wb", quiet = TRUE)
+
+  result <- read_tsv_chunked(
+    raw_path,
+    callback = DataFrameCallback$new(
+      function(x, pos) filter(x, prev == source_page)
+    ),
+    chunk_size = 1e6,
+    col_names = c("prev", "curr", "type", "n"),
+    col_types = "cccd",
+    quote = ""
+  ) |>
+    mutate(month = ymd(paste0(ym, "-01")))
+
+  saveRDS(result, out_path)
+  file.remove(raw_path)   # free the disk space
+  invisible(result)
+}
+```
+
+```{r}
+#| label: test-one-month
+
+first <- needed_months[1, ]
+test_clicks <- get_clicks(first$ym, first$file, first$url, first$source_page)
+
+nrow(test_clicks)
+test_clicks |> arrange(desc(n)) |> slice_head(n = 10)
+```
+
+```{r}
+#| label: test-4-one-month
+# TEST 4: one month downloaded and filtered correctly
+stopifnot(
+  "no rows came back"            = nrow(test_clicks) > 0,
+  "wrong source page in results" = all(test_clicks$prev == first$source_page),
+  "raw file was not deleted"     = !file.exists(file.path("data/raw/clickstream", first$file)),
+  "processed file was not saved" = file.exists(paste0("data/processed/clickstream/", first$ym, ".rds"))
+)
+message("TEST 4 passed: one month downloaded, filtered, saved and cleaned up")
+```
+Ok, this seems to have worked and passed the test. Time to download all the files. Brace yourself
+```{r}
+#| label: load-all-months
+
+all_clicks <- list.files("data/processed/clickstream", pattern = "\\.rds$", full.names = TRUE) |>
+  map(readRDS) |>
+  bind_rows()
+
+nrow(all_clicks)
+all_clicks |> count(month)
+```
+
+```{r}
+#| label: test-5-all-months
+# TEST 5: every needed month was downloaded and filtered correctly
+page_check <-
+  all_clicks |>
+  distinct(month, prev) |>
+  left_join(select(needed_months, month, source_page), by = "month")
+
+stopifnot(
+  "a needed month has no rows"      = setequal(unique(all_clicks$month), needed_months$month),
+  "wrong source page in some rows"  = all(page_check$prev == page_check$source_page),
+  "a raw file was left on disk"     = length(list.files("data/raw/clickstream")) == 0
+)
+message("TEST 5 passed: all months downloaded, filtered and cleaned up")
+```
+```{r}
+length(list.files("data/processed/clickstream", pattern = "\\.rds$"))
+saveRDS(needed_months, "data/processed/needed_months.rds")
+```
 
 
 
