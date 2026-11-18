@@ -1,6 +1,6 @@
 # SOCI_quant_502
 
-## Data
+## CCC Data
 
 Raw CCC protest data are in `data/raw/ccc/`, downloaded from the CCC website https://dataverse.harvard.edu/dataverse/crowdcountingconsortium/:
 
@@ -15,3 +15,12 @@ Raw CCC protest data are in `data/raw/ccc/`, downloaded from the CCC website htt
 - A **protest wave** is a month in the top 10% of monthly counts (an arbitrary cutoff; sensitivity tests are a next step).
 - The study window runs from December 2017 to the last full month of CCC data.
 - A few extreme outlier months remain unresolved. The heat map colour scale is capped at 350 so the other months stay readable.
+
+## Wikipedia Data
+
+The raw clickstream files (40 months of Wikimedia dumps) are not included.
+data/processed/clickstream/ has the filtered results.
+
+## Other
+
+requires ggfx (install.packages("ggfx")). I found out how to make my charts glow and think you will enjoy them too!
